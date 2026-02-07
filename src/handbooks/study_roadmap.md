@@ -62,25 +62,52 @@
    - Why: Common in combination/permutation problems
    - Practice: 15-20 problems
 
-### Phase 5: Specialized Topics (Week 8+)
+### Phase 5: Problem-Solving Patterns (Week 8)
+**Goal:** Master common problem-solving paradigms
+
+10. **Monotonic Stack / Queue**
+    - Time: 2-3 days
+    - Why: Next greater/smaller element problems are very frequent at FAANG
+    - Focus areas: NGE, histogram, trapping rain water, sliding window max
+    - Practice: 12-15 problems
+
+11. **Greedy Algorithms**
+    - Time: 3-4 days
+    - Why: Fundamental paradigm, faster than DP when applicable
+    - Focus areas: Interval scheduling, jump game, digit manipulation
+    - Practice: 15-20 problems
+
+12. **Divide and Conquer**
+    - Time: 2-3 days
+    - Why: Classic CS pattern, good for Google; deepens recursion skills
+    - Focus areas: Merge sort variants, quick select, tree construction
+    - Practice: 10-15 problems
+
+### Phase 6: Grids & Specialized Topics (Weeks 9-10)
 **Goal:** Round out knowledge for hard problems
 
-10. **Tries**
+13. **Matrix / Grid**
+    - Time: 3-4 days
+    - Why: Extremely common; combines BFS/DFS/DP on 2D data
+    - Focus areas: Islands, grid BFS, matrix DP, spiral/rotation
+    - Practice: 15-20 problems
+
+14. **Tries**
     - Time: 2 days
     - Why: String problems, prefix matching
     - Practice: 8-10 problems
 
-11. **Intervals**
+15. **Intervals**
     - Time: 2 days
     - Why: Scheduling problems common in real scenarios
     - Practice: 10-12 problems
 
-12. **Bit Manipulation**
+16. **Bit Manipulation**
     - Time: 1-2 days
     - Why: Occasional but elegant solutions
     - Practice: 8-10 problems
 
-13. **Advanced DP** (If time permits)
+17. **Advanced DP** (If time permits)
     - Time: 3-4 days
     - Focus: Bitmask DP, tree DP, digit DP
     - Practice: 10-15 problems
@@ -95,18 +122,22 @@
 - Trees (DFS/BFS)
 - Dynamic Programming
 - BFS/DFS Graphs
+- Matrix / Grid
 
 **Should Know (High ROI):**
 - Sliding Window
 - Heaps
 - Backtracking
-- Tries
+- Monotonic Stack / Queue
+- Greedy Algorithms
 - Intervals
 
 **Good to Know (Nice to have):**
 - Union-Find
+- Divide and Conquer
+- Tries
 - Bit Manipulation
-- Advanced graph algorithms
+- Advanced DP
 - Segment Trees
 
 ---
@@ -156,11 +187,21 @@
 - Thu-Fri: Backtracking (handbook + 15 problems)
 - Weekend: Review all DP + mock
 
-### Week 8: Specialization
-- Mon: Tries (handbook + 8 problems)
-- Tue: Intervals (handbook + 10 problems)
-- Wed: Bit manipulation (handbook + 8 problems)
-- Thu-Fri: Weak areas + hard problems
+### Week 8: Problem-Solving Paradigms
+- Mon-Tue: Monotonic Stack/Queue (handbook + 12 problems)
+- Wed-Thu: Greedy Algorithms (handbook + 15 problems)
+- Fri: Divide and Conquer (handbook + 10 problems)
+- Weekend: Review paradigms + mock interview
+
+### Week 9: Grids & Specialization
+- Mon-Tue: Matrix/Grid (handbook + 15 problems)
+- Wed: Tries (handbook + 8 problems)
+- Thu: Intervals (handbook + 10 problems)
+- Fri: Bit manipulation (handbook + 8 problems)
+- Weekend: Weak areas + hard problems
+
+### Week 10: Final Review
+- Mon-Fri: Weak areas + company-specific problems
 - Weekend: Final review + full mock interviews
 
 ---
@@ -182,20 +223,25 @@
 
 ## Handbook Creation Order
 
-Based on priority and dependencies:
+All 17 core handbooks are complete:
 
-1. **Binary Search** ✅ Done!
-2. **Two Pointers** (use handbook generator prompt)
-3. **Sliding Window** (use handbook generator prompt)
-4. **Trees and Tries** (use handbook generator prompt)
-5. **BFS/DFS** (use handbook generator prompt)
-6. **Dynamic Programming** (example prompt provided!)
-7. **Backtracking** (use handbook generator prompt)
-8. **Heaps** (use handbook generator prompt)
-9. **Intervals** (use handbook generator prompt)
-10. **Union-Find** (use handbook generator prompt)
-
-**Pro Tip:** Create handbooks 1-2 topics ahead of your study schedule. This gives you time to absorb and lets you start studying immediately.
+1. **Binary Search** ✅
+2. **Two Pointers** ✅
+3. **Sliding Window** ✅
+4. **Trees** ✅
+5. **Tries** ✅
+6. **BFS/DFS Graphs** ✅
+7. **Dynamic Programming** ✅
+8. **Advanced DP** ✅
+9. **Backtracking** ✅
+10. **Heaps** ✅
+11. **Intervals** ✅
+12. **Union-Find** ✅
+13. **Bit Manipulation** ✅
+14. **Monotonic Stack / Queue** ✅
+15. **Greedy Algorithms** ✅
+16. **Divide and Conquer** ✅
+17. **Matrix / Grid** ✅
 
 ---
 
@@ -216,6 +262,8 @@ Union-Find (graph connectivity)
     ↓
 Topological Sort (uses BFS/DFS)
 
+Trees + BFS/DFS → Matrix / Grid (grid = graph in 2D)
+
 Dynamic Programming (standalone, but harder)
     ↓
 Advanced DP (builds on basic DP)
@@ -224,12 +272,15 @@ Backtracking (standalone)
     ↓
 Tries (uses recursion/backtracking concepts)
 
+Monotonic Stack / Queue (standalone, after arrays)
+Greedy Algorithms (standalone; contrast with DP)
+Divide and Conquer (standalone; deepens recursion)
 Heaps (standalone)
-Intervals (standalone, uses sorting)
+Intervals (standalone, uses sorting + greedy)
 Bit Manipulation (standalone)
 ```
 
-**Key Insight:** Do Trees before Graphs. Do basic DP before advanced DP. Most others are independent.
+**Key Insight:** Do Trees before Graphs. Do BFS/DFS before Matrix/Grid. Do basic DP before advanced DP. Learn Greedy alongside DP to understand when each applies. Most others are independent.
 
 ---
 
@@ -246,7 +297,7 @@ Bit Manipulation (standalone)
 **Overall Progress:**
 - Total problems solved: _____ / 250 (target)
 - Mock interviews completed: _____ / 8 (weekly)
-- Topics mastered: _____ / 10
+- Topics mastered: _____ / 17
 
 ---
 
@@ -300,14 +351,14 @@ Bit Manipulation (standalone)
 ## Customization Tips
 
 **If you have less time (4 weeks):**
-- Focus on: Binary Search, Two Pointers, Trees, DP, BFS/DFS
+- Focus on: Binary Search, Two Pointers, Sliding Window, Trees, DP, BFS/DFS, Matrix/Grid
 - Do only medium problems
 - 1 mock interview per week
 
 **If you have more time (12+ weeks):**
 - Add advanced topics: Segment trees, Fenwick trees
 - Do more hard problems
-- Deeper dive into DP variants
+- Deeper dive into DP variants, Greedy proofs, D&C analysis
 - Company-specific prep earlier
 
 **If you're rusty:**
