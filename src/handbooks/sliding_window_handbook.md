@@ -1351,6 +1351,7 @@ def at_most(k):
 - Need non-contiguous elements
 - Array is not processed linearly
 - Optimal substructure suggests DP
+- **Negative numbers + sum target**: Sliding window assumes adding elements makes the sum larger (monotonicity). Negative numbers break this — use Prefix Sum + HashMap instead.
 
 ### Step 2: Fixed or Variable Window?
 

@@ -42,11 +42,12 @@ for all 17 interview patterns -- organized from foundational to advanced.
 <a name="two-pointers"></a>
 ## 1. TWO POINTERS
 
-### The "Pinch vs Slide" Mental Model
-**Mnemonic: "Pinch from ends, or Slide together"**
+### The "Pinch, Slide, or Parallel" Mental Model
+**Mnemonic: "Pinch from ends, Slide together, or walk Parallel arrays"**
 
 - **PINCH (Opposite Ends)**: Pointers start at opposite ends, move inward like a pincer. Use for: pair sum in sorted array, palindrome check, container with most water.
 - **SLIDE (Same Direction)**: Both pointers start from one end, move the same way at different speeds. Use for: remove duplicates, fast/slow cycle detection, linked list middle.
+- **PARALLEL (Two Arrays)**: One pointer per array, advance based on comparison. Use for: merge sorted arrays, intersection of sorted arrays, shortest word distance.
 
 ### Trigger Words
 | Keyword | Think Two Pointers |
@@ -58,9 +59,9 @@ for all 17 interview patterns -- organized from foundational to advanced.
 | "3Sum / 4Sum" | Fix one, two-pointer the rest |
 
 ### The Golden Rule
-**"Two pointers reduces O(n²) to O(n) on sorted data."**
+**"Two pointers reduces O(n²) to O(n) when data has a sorted or structural constraint."**
 
-If you're about to write a nested loop on sorted data, stop and think two pointers.
+If you're about to write a nested loop on sorted data (or data with another constraint like a linked list), stop and think two pointers.
 
 > Sources: [GeeksforGeeks](https://www.geeksforgeeks.org/dsa/two-pointers-technique/), [Hello Interview](https://www.hellointerview.com/learn/code/two-pointers/overview), [AlgoMap](https://algomap.io/lessons/2-pointers)
 
@@ -123,8 +124,21 @@ mid = (lo + hi) // 2         # OVERFLOW RISK
 ### Template Decision
 | Loop Condition | When to Use |
 |---|---|
-| `while lo <= hi` | Standard search: check every element, return exact match |
-| `while lo < hi` | Boundary finding: converge to a single point |
+| `while lo < hi` | **Preferred.** Boundary finding: converge to a single point. Also works for exact match. |
+| `while lo <= hi` | Standard search when you need to check every element and return -1 on miss |
+
+**Handbook recommends `while lo < hi` as the default** -- it avoids off-by-one errors and naturally converges.
+
+### The Two Mid Formulas
+```python
+mid = lo + (hi - lo) // 2       # LEFT-BIASED (rounds down) -- use with lo = mid + 1
+mid = lo + (hi - lo + 1) // 2   # RIGHT-BIASED (rounds up) -- use with hi = mid - 1
+```
+
+### Infinite Loop Pitfall
+**"If `lo = mid` with left-biased mid, you get an infinite loop."**
+
+When your update is `lo = mid` (not `lo = mid + 1`), you MUST use right-biased mid. Otherwise `lo` never advances when `hi - lo == 1`.
 
 ### Beyond Arrays
 **"Binary search works on any monotonic function, not just arrays."**
@@ -152,15 +166,17 @@ while stack and stack[-1] [OPERATOR] current:
     pop
 push current
 ```
-- `>=` → Monotonic Increasing (pops bigger ones)
-- `<=` → Monotonic Decreasing (pops smaller ones)
+- `>` (or `>=`) → Monotonic Increasing (pops bigger ones)
+- `<` (or `<=`) → Monotonic Decreasing (pops smaller ones)
+
+**Note:** Use strict `>` / `<` to allow equal elements on the stack (needed for problems with duplicates). Use `>=` / `<=` to keep only strictly monotonic elements. The handbook uses strict operators by default.
 
 ### Trigger Words
 | Keyword | Stack Type |
 |---|---|
 | "Next Greater Element" | Decreasing stack, scan L→R |
 | "Next Smaller Element" | Increasing stack, scan L→R |
-| "Previous Greater/Smaller" | Same but scan R→L |
+| "Previous Greater/Smaller" | Same stack type, scan L→R, record answer at push time |
 | "Largest rectangle in histogram" | Increasing stack + sentinels |
 | "Trapping rain water" | Stack or two pointers |
 | "Daily temperatures" | Decreasing stack |
@@ -191,8 +207,10 @@ SCHEDULE problems → sort by END time
 ### Overlap Detection Formula
 **"Two intervals overlap if each one starts before the other ends."**
 ```python
-overlap = a.start < b.end and b.start < a.end
+overlap = a.start < b.end and b.start < a.end   # strict: for scheduling (no touching)
+overlap = a.start <= b.end and b.start <= a.end  # non-strict: for merge (touching counts)
 ```
+**For merge problems** (LC 56), use `<=` because `[1,3]` and `[3,5]` should merge. **For scheduling** (LC 252), use `<` because touching intervals don't conflict.
 
 ### Trigger Words
 - "Overlapping intervals", "merge intervals"
@@ -248,15 +266,15 @@ result = -heapq.heappop(heap)  # extract as max heap
 ## 7. GREEDY ALGORITHMS
 
 ### The "No Regret" Test
-**"If you'll NEVER REGRET the choice later, go Greedy. If you MIGHT regret, go DP."**
+**"If you'll NEVER REGRET the choice later, go Greedy. If you MIGHT regret but subproblems overlap, go DP. If you need ALL solutions, go Backtracking."**
 
 ### CLIP Checklist
 **"CLIP = Check Local, Independent, Progressive"**
 - **C**hoices are **L**ocal: only needs local information
-- **I**ndependent: one choice doesn't affect future choices
+- **I**ndependent: one choice doesn't eliminate better future options (doesn't require considering all possibilities)
 - **P**rogressive: problem strictly shrinks after each choice
 
-All three hold → Greedy. Any fails → Consider DP.
+All three hold → Greedy. Any fails → Consider DP or Backtracking.
 
 ### The Meta-Pattern
 **"When in doubt, SORT it out"**
@@ -266,6 +284,7 @@ Most greedy problems follow: **Sort → Iterate → Decide → Collect**
 | Problem Type | Sort By |
 |---|---|
 | Activity/interval selection | End time (earliest) |
+| Merge intervals | Start time (earliest) |
 | Job scheduling with deadlines | Deadline (earliest) |
 | Fractional knapsack | Value/weight ratio (highest) |
 
@@ -276,7 +295,7 @@ Most greedy problems follow: **Sort → Iterate → Decide → Collect**
 ### GC + OS = Greedy is Boss
 - **GC** = Greedy Choice Property
 - **OS** = Optimal Substructure
-- Both hold → Greedy works. Only OS → need DP.
+- Both hold → Greedy works. Only OS → need DP. Neither → Backtracking.
 
 > Sources: [Stanford CS161](https://web.stanford.edu/class/archive/cs/cs161/cs161.1138/handouts/120%20Guide%20to%20Greedy%20Algorithms.pdf), [AlgoMaster](https://algomaster.io/learn/dsa/greedy-introduction), [Interview Cake](https://www.interviewcake.com/concept/java/greedy)
 
@@ -316,19 +335,23 @@ Place 3 dots around each node (left, bottom, right). Crawl around the tree:
 ## 9. TRIES
 
 ### The One Rule
-**"If you need PREFIX lookups across many words, it's a Trie."**
+**"If you need PREFIX lookups, XOR-based search, or wildcard matching across many words, it's a Trie."**
 
 ### Trie vs HashMap
-- **HashMap**: Fast exact-match lookup only
-- **Trie**: Returns ALL words matching a prefix, memory-efficient with shared prefixes, preserves lexicographic order
+- **HashMap**: Fast exact-match lookup only, less memory overhead for small sets
+- **Trie**: Returns ALL words matching a prefix, shares prefixes to save space when words overlap heavily, preserves lexicographic order. Note: can use MORE memory than a HashMap for sparse word sets due to child pointers.
 
 ### Trigger Words
 - "Prefix search", "autocomplete", "dictionary"
 - "Spell check", "word search II" (multiple words in grid)
 - "Lexicographic order"
+- "Maximum XOR" (binary trie)
+- "Wildcard matching" (`.` matches any character)
 
 ### Mental Model
-**"A Trie is a tree of characters. Each root-to-leaf path spells a word."**
+**"A Trie is a tree of characters. Each root-to-node path (where `is_end=True`) spells a word."**
+
+Words can end at internal nodes, not just leaves. For example, "car" and "card" share the same path up to 'r', but "car" has `is_end=True` at 'r' (an internal node).
 
 > Sources: [Interview Cake](https://www.interviewcake.com/concept/java/trie), [GeeksforGeeks](https://www.geeksforgeeks.org/dsa/trie-insert-and-search/), [HeyCoach](https://heycoach.in/blog/trie-vs-hashmap/)
 
@@ -345,7 +368,7 @@ Place 3 dots around each node (left, bottom, right). Crawl around the tree:
 | Shortest path (unweighted) | BFS | Queue (FIFO) |
 | Level-by-level exploration | BFS | Queue (FIFO) |
 | Explore all paths | DFS | Stack / Recursion |
-| Detect cycles | DFS | Visited + In-path set |
+| Detect cycles | DFS (3-color) or Kahn's BFS | Visited + In-path set, or in-degree array |
 | Topological sort | DFS or Kahn's BFS | Stack or Queue |
 | Connected components | Either | Visited set |
 
@@ -394,7 +417,8 @@ After traversing each wall, move that wall inward.
 **"Rotate 90° clockwise = Transpose + Reverse each row"**
 
 ### Sorted Matrix Search
-**"Treat m×n matrix as 1D sorted array: row = mid // cols, col = mid % cols"**
+- **Fully sorted (LC 74)**: Treat m×n matrix as 1D sorted array: `row = mid // cols, col = mid % cols`
+- **Row + column sorted (LC 240)**: Start at top-right corner, staircase walk: go left if too big, go down if too small. O(m + n).
 
 > Sources: [Tech Interview Handbook](https://www.techinterviewhandbook.org/algorithms/matrix/), [GeeksforGeeks](https://www.geeksforgeeks.org/dsa/print-a-given-matrix-in-spiral-form/), [Labuladong](https://labuladong.online/algo/en/frequency-interview/island-dfs-summary/)
 
@@ -425,7 +449,12 @@ Optimizations:
 - "MST (Kruskal's algorithm)"
 
 ### Union Find vs BFS/DFS
-**"Static graph → BFS/DFS. Edges added dynamically → Union Find."**
+**"Edges added dynamically → Union Find. Static graph with one-time query → BFS/DFS."**
+
+Note: Union Find is also useful on static graphs when you need **repeated** "are X and Y connected?" queries -- O(α(n)) per query vs O(V+E) per BFS/DFS.
+
+### Key Limitation
+**"Union Find can union but can't un-union."** Deletions are not supported. If edges are removed, consider rebuilding or using a different approach.
 
 > Sources: [CP-Algorithms](https://cp-algorithms.com/data_structures/disjoint_set_union.html), [GeeksforGeeks](https://www.geeksforgeeks.org/dsa/introduction-to-disjoint-set-data-structure-or-union-find-algorithm/)
 
@@ -436,14 +465,16 @@ Optimizations:
 
 ### The Template: "Choose, Explore, Unchoose"
 ```python
-def backtrack(state):
-    if is_solution(state):
-        output(state); return
-    for candidate in get_candidates(state):
-        state.add(candidate)      # CHOOSE
-        backtrack(state)           # EXPLORE
-        state.remove(candidate)   # UNCHOOSE
+def backtrack(path):
+    if is_solution(path):
+        result.append(path.copy())  # IMPORTANT: .copy() since path is mutable
+        return
+    for candidate in get_candidates(path):
+        path.append(candidate)    # CHOOSE
+        backtrack(path)           # EXPLORE
+        path.pop()                # UNCHOOSE
 ```
+**Note:** Use `.append()`/`.pop()` for lists (ordered, allows duplicates). Use `.add()`/`.remove()` only for set-based `used` tracking.
 
 ### Permutations vs Combinations vs Subsets
 | Type | Constraint | Template Tweak |
@@ -508,12 +539,15 @@ T(n) = aT(n/b) + O(n^d) -- compare log_b(a) to d:
 ### The Recognition Rule
 **"Overlapping subproblems + Optimal substructure = DP"**
 
-### The 5-Step Framework: "STBAO"
-1. **S**tate: What variables define a subproblem?
-2. **T**ransition: How does a bigger problem relate to smaller ones?
-3. **B**ase case: What are the trivially known values?
-4. **A**nswer: Which cell has the final answer?
-5. **O**rder: What order to compute subproblems?
+### The DP Recipe (STBAO+)
+1. **S**tate: What variables define a subproblem? (What dimensions does `dp` have?)
+2. **T**ransition: How does a bigger problem relate to smaller ones? (The recurrence relation)
+3. **B**ase case: What are the trivially known values? (Initialize the DP table)
+4. **A**nswer: Which cell has the final answer? (`dp[n]`, `dp[n][W]`, `max(dp)`, etc.)
+5. **O**rder: What order to fill the table? (Ensure dependencies are computed first)
+6. **Optimize**: Can you reduce space? (Rolling array, 1D instead of 2D)
+
+The handbook also teaches the **FAST Method**: **F**ind recursive solution → **A**nalyze for overlapping subproblems → **S**ave results (memoize) → **T**urn bottom-up. Both frameworks arrive at the same solution.
 
 ### Trigger Words
 | Keyword | DP Pattern |
@@ -552,8 +586,9 @@ Use integer bits as boolean flags. Bit i = 1 means element i is used.
 **Trigger: "Multiple states with transitions = State Machine DP"**
 
 Draw the states and transitions. Classic: buy/sell stock with cooldown.
-- States: Hold, Not-Hold, Cooldown
-- Transitions: Hold→Sell→Cooldown→Buy→Hold
+- States: **hold** (holding stock), **sold** (just sold, in cooldown), **rest** (not holding, free to buy)
+- Transitions: rest→buy→hold, hold→sell→sold, sold→rest, rest→rest, hold→hold
+- Each day, compute all states from previous day's values
 
 ### Interval DP
 **Trigger: "Merge/split ranges optimally = Interval DP"**
@@ -575,19 +610,22 @@ x ^ x = 0     (anything XOR itself is 0)
 x ^ 0 = x     (anything XOR 0 is itself)
 x ^ y ^ y = x (XOR is self-inverse)
 ```
+**Key properties:** XOR is **commutative** (`a ^ b == b ^ a`) and **associative** (`(a ^ b) ^ c == a ^ (b ^ c)`). This means order doesn't matter -- you can XOR elements in any order and get the same result.
+
 **Application**: Find single number where all others appear twice → XOR everything.
 
-### The "SCCT" Operations
+### The "CSCT" Operations
 | Operation | Formula | Mnemonic |
 |---|---|---|
-| **Check** bit i | `(n >> i) & 1` | AND with mask |
-| **Set** bit i | `n \| (1 << i)` | OR with mask |
-| **Clear** bit i | `n & ~(1 << i)` | AND with inverted mask |
-| **Toggle** bit i | `n ^ (1 << i)` | XOR with mask |
+| **C**heck bit i | `(n >> i) & 1` | AND with mask |
+| **S**et bit i | `n \| (1 << i)` | OR with mask |
+| **C**lear bit i | `n & ~(1 << i)` | AND with inverted mask |
+| **T**oggle bit i | `n ^ (1 << i)` | XOR with mask |
 
 ### Power Tricks
-- **Is power of 2?** `n & (n-1) == 0 and n > 0`
-- **Is odd?** `n & 1 == 1`
+**Warning: Operator precedence!** `&` has lower precedence than `==` in Python. Always use parentheses:
+- **Is power of 2?** `(n & (n-1)) == 0 and n > 0`
+- **Is odd?** `(n & 1) == 1`
 - **Clear rightmost 1-bit**: `n & (n-1)`
 - **Isolate rightmost 1-bit**: `n & (-n)`
 - **Count set bits**: Repeatedly `n = n & (n-1)`, count iterations
@@ -645,15 +683,15 @@ x ^ y ^ y = x (XOR is self-inverse)
 "All positive elements → Sliding Window. Negatives present → Prefix Sum."
 
 **DP vs Greedy vs Backtracking:**
-1. Can you make a greedy choice that's never wrong? → **Greedy** (fastest)
-2. Need optimal solution with overlapping subproblems? → **DP**
-3. Need ALL solutions or constraint satisfaction? → **Backtracking**
+1. Can you make a greedy choice that's never wrong? → **Greedy** (fastest, O(n log n) typically)
+2. Need optimal solution with overlapping subproblems? → **DP** (polynomial, avoids recomputation)
+3. Need ALL solutions or constraint satisfaction? → **Backtracking** (exponential, explores all paths)
 
 **BFS vs DFS:**
 "Closest/nearest = BFS. Complete/all paths = DFS."
 
 **Union Find vs BFS/DFS for connectivity:**
-"Static graph = BFS/DFS. Edges added over time = Union Find."
+"Edges added dynamically = Union Find. Static one-time query = BFS/DFS. Repeated queries on static graph = either works, UF has better per-query cost."
 
 ### Subarray vs Subsequence vs Subset
 | Type | Contiguous? | Order? | Count | Technique |

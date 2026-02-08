@@ -2,10 +2,15 @@
 
 ## How to Use This Prompt
 
-1. Copy the prompt below
-2. Replace `[TOPIC]` with your desired topic (e.g., "Dynamic Programming", "BFS/DFS", "Trees and Tries", etc.)
-3. Replace `[TOPIC_EXAMPLES]` with 2-3 specific examples of that topic
-4. Paste into Claude and get your comprehensive handbook!
+1. Copy the prompt below (between the `---` markers)
+2. Replace `[TOPIC]` with your desired topic
+3. Replace `[PHILOSOPHY]` with a one-sentence philosophy for the topic
+4. Replace `[FIRST_PRINCIPLES]` with 2-3 real-world analogies
+5. Replace `[PATTERNS]` with 5-7 specific patterns to cover
+6. Replace `[PROBLEMS]` with 15-20 specific LeetCode problems (with numbers)
+7. Paste into Claude and get your comprehensive handbook
+
+All 17 core handbooks are already created (see list at the bottom). Use this prompt to create additional handbooks or regenerate existing ones with improvements.
 
 ---
 
@@ -15,221 +20,221 @@
 
 I am preparing for FAANG-level coding interviews and need a comprehensive, detailed handbook for **[TOPIC]**. I want this to be similar in quality and structure to a professional interview preparation guide.
 
-## Requirements:
-
-### 1. FOCUS ON EXPLAINABILITY & READABILITY
-This is THE MOST IMPORTANT requirement. Every concept, pattern, and code snippet must answer "WHY this way?":
-- Why does this approach work?
-- Why this code structure over alternatives?
-- Why these specific steps?
-- What's the intuition behind this pattern?
-
-**Never just show code - always explain the reasoning.**
-
-### 2. COMPREHENSIVE STRUCTURE
-
-Please organize the handbook with these sections:
-
-#### A. Core Philosophy & Fundamentals (15-20% of content)
-- Mental models for understanding [TOPIC]
-- Common misconceptions and how to think correctly
-- Fundamental principles that apply across all problems
-- Key terminology and concepts
-
-#### B. Master Templates (20-25% of content)
-- Provide 2-4 core templates that cover most use cases
-- Each template should include:
-  - When to use it
-  - Why it's structured this way
-  - Step-by-step breakdown
-  - Common variations
-  - Time/space complexity
-- Make templates memorization-friendly
-- Use consistent naming and structure
-
-#### C. Pattern Classification (10-15% of content)
-- Categorize problems into 5-8 distinct patterns
-- For each pattern:
-  - Clear identification criteria
-  - Mental model / visualization
-  - When it applies
-  - Example problem types
-- Include a decision tree or flowchart for pattern recognition
-
-#### D. Complete Pattern Library (35-40% of content)
-- For EACH pattern, provide:
-  - **Pattern Name & Use Case**
-  - **Recognition:** How to identify this pattern in a problem
-  - **Approach:** Step-by-step strategy
-  - **Template Code:** Clean, well-commented implementation
-  - **Visual Example:** Diagram or trace showing execution
-  - **Complexity Analysis:** Time and space with explanation
-  - **Common Variations:** How the pattern adapts
-  - **Related Problems:** 2-3 LeetCode examples
-  
-Cover these patterns at minimum:
-[List 6-8 specific patterns for your topic here]
-
-Examples:
-- For DP: 1D DP, 2D DP, Knapsack, LIS, LCS, State Machine, etc.
-- For BFS/DFS: Level-order, Path finding, Cycle detection, Topological sort, etc.
-- For Trees: Traversals, LCA, Path sums, Serialization, BST operations, etc.
-
-#### E. Problem Recognition Framework (5-8% of content)
-- Decision tree: How to identify which pattern to use
-- Keywords/phrases in problem statements that signal patterns
-- The "IFTTT" test or similar heuristic for this topic
-- Step-by-step approach to analyze a new problem
-
-#### F. Common Pitfalls & Solutions (5-8% of content)
-- Top 10 mistakes people make
-- For each mistake:
-  - What goes wrong (with example)
-  - Why it happens
-  - How to fix it
-  - How to avoid it
-
-#### G. Post-Processing & Edge Cases (3-5% of content)
-- Common edge cases for this topic
-- Validation and boundary checking
-- Off-by-one errors specific to this topic
-- Input validation patterns
-
-#### H. Interview Execution Guide (3-5% of content)
-- Pre-interview checklist
-- During-interview strategy
-- Time management (how long to spend on each phase)
-- Communication tips specific to this topic
-- How to test and verify solutions
-
-#### I. Quick Reference Section (5% of content)
-- Cheat sheet with all templates
-- Complexity reference table
-- Pattern recognition quick guide
-- Common code snippets
-
-#### J. Practice Problem Set (5% of content)
-- Organized by difficulty: Easy, Medium, Hard
-- Organized by pattern
-- Recommended practice order
-- Time targets for each difficulty
-
-### 3. STYLE REQUIREMENTS
-
-**Clarity:**
-- Use simple, direct language
-- Break complex concepts into digestible chunks
-- Use analogies and real-world examples
-- Progressive disclosure (simple first, then complexity)
-
-**Visuals:**
-- Use ASCII diagrams, trees, arrays, tables
-- Show before/after states
-- Trace execution with examples
-- Use arrows and annotations
-
-**Code Quality:**
-- Clean, readable code with meaningful variable names
-- Comprehensive comments explaining WHY, not just WHAT
-- Consistent style across all examples
-- Show both correct and incorrect approaches
-
-**Formatting:**
-- Clear headers and sub-headers
-- Use tables for comparisons
-- Use code blocks with syntax highlighting
-- Use callout boxes for important notes (⚠️, ✅, ❌, 💡)
-- Bullet points and numbered lists
-
-### 4. DEPTH REQUIREMENTS
-
-**Go Deep on Core Concepts:**
-- Don't just list patterns - explain the intuition
-- Show why certain approaches fail
-- Explain complexity analysis step-by-step
-- Provide multiple examples for complex patterns
-
-**Cover Edge Cases:**
-- Empty inputs
-- Single element
-- Duplicates (if applicable)
-- Maximum/minimum constraints
-- Special conditions
-
-**Show Variations:**
-- How patterns combine
-- How to modify for different constraints
-- How to optimize further
-
-### 5. INTERVIEW FOCUS
-
-Remember, this is for CODING INTERVIEWS, so:
-- Prioritize patterns that appear frequently in interviews
-- Include FAANG-specific examples (mention which companies ask what)
-- Show how to communicate solution approach
-- Include complexity analysis (mandatory in interviews)
-- Show how to optimize brute force → optimal solution
-- Include "follow-up question" sections
-
-### 6. SPECIFIC EXAMPLES TO INCLUDE
-
-Please ensure you cover these specific problems/scenarios:
-[TOPIC_EXAMPLES]
-
-For example:
-- For DP: Coin change, House robber, Longest increasing subsequence, Edit distance
-- For BFS/DFS: Number of islands, Course schedule, Word ladder, Clone graph
-- For Trees: Validate BST, Lowest common ancestor, Serialize/deserialize, Path sum
-
-### 7. QUALITY STANDARDS
-
-The handbook should be:
-- ✅ Comprehensive: 95%+ pattern coverage for this topic
-- ✅ Self-contained: Can be studied standalone
-- ✅ Practical: Immediately usable in interviews
-- ✅ Clear: Readable in one sitting (but detailed enough for deep study)
-- ✅ Structured: Easy to find information quickly
-- ✅ Memorable: Templates stick in your mind
-
-### 8. LENGTH & DETAIL
-
-- Aim for 8,000-15,000 words (comprehensive but focused)
-- Each major pattern should get 500-800 words
-- Don't skimp on explanations - detail is valued
-- Use examples liberally
-- Repeat key concepts in different contexts
-
-### 9. OUTPUT FORMAT
-
-Please provide the handbook in Markdown format with:
-- Clear table of contents with anchor links
-- Consistent heading hierarchy
-- Code blocks with language tags
-- Tables where appropriate
-- Visual separators between major sections
+The handbook must follow this EXACT structure. Every section is required.
 
 ---
 
-## ADDITIONAL CONTEXT
+### OPENING FORMAT
 
-**My Background:**
-- I am a software engineer preparing for senior-level FAANG interviews
-- I prefer Python for interviews (use Python for code examples)
-- I learn best with: explanations of WHY, visual aids, and multiple examples
+Start with:
+
+```markdown
+# The Complete [TOPIC] Handbook
+> A template-based approach for mastering [TOPIC] in coding interviews
+
+**Philosophy:** [PHILOSOPHY]
+```
+
+### SECTION STRUCTURE (10 numbered sections + Final Thoughts + Appendix)
+
+#### Section 1: Understanding the Core Philosophy (15-20% of content)
+
+This section has a specific format with three required opening subsections, then deeper technical content:
+
+**Required opening subsections:**
+- **First Principles** -- 2-3 physical-world analogies that make the concept intuitive to a non-programmer. Each analogy should be a named concept (e.g., "The Coin Cashier", "The Tournament Bracket") followed by 2-3 sentences explaining how it maps to the algorithm.
+- **No-Jargon Translation** -- A bullet list defining every key term in plain English (no CS jargon).
+- **Mental Model** -- A single-sentence metaphor in a blockquote (`> "A greedy algorithm is like..."`) that captures the essence of the pattern.
+
+**Then deeper technical content:**
+- When does this pattern work / fail? (with concrete examples showing both)
+- Key distinctions (e.g., Greedy vs DP, BFS vs DFS)
+- Visual Understanding -- ASCII art showing the core concept
+- Any proof techniques or correctness arguments relevant to the pattern
+
+#### Section 2: Master Templates (20-25% of content)
+
+Provide 3-6 Python templates covering the main variations. Include:
+- **Decision matrix** (table): "If you see X → use Template Y"
+- Each template should have:
+  - A descriptive name (e.g., "Template A: Sort-then-Iterate")
+  - When to use it (one-liner)
+  - Complete Python code with comments explaining WHY each line exists
+  - Time/space complexity
+  - Example problem it applies to
+
+#### Section 3: Pattern Classification Guide (10% of content)
+
+Categorize all problems into 5-7 distinct patterns with:
+- Pattern name
+- One-sentence description
+- Key signal / trigger words
+- Example problems (LeetCode numbers)
+- Table format preferred
+
+#### Section 4: Complete Pattern Library (35-40% of content -- the bulk)
+
+This is the largest section. Organize into 5-7 PATTERNS, each with 2-3 fully solved problems.
+
+**Each problem MUST follow this exact format:**
+```
+### PATTERN N: [Pattern Name]
+
+#### Pattern NA: [Problem Name]
+
+**Problem:** LeetCode [NUMBER] - [Problem statement in 1-2 sentences]
+
+**Example:**
+[Input/Output/Explanation in a code block]
+
+**Key Insight:** [2-3 sentences explaining WHY this approach works and what makes it non-obvious. This is the most important part -- explain the "aha moment".]
+
+**Visual Trace:**
+[ASCII art showing step-by-step execution on the example input. Show state changes, pointer movements, stack contents, etc.]
+
+**Solution:**
+[Complete Python solution with comments explaining key decisions]
+
+**Complexity:** Time O(...), Space O(...) with brief justification.
+```
+
+**Target: 15-20 fully solved LeetCode problems per handbook.** Every solution must be complete, runnable Python code.
+
+#### Section 5: Post-Processing Reference (2-3% of content)
+
+A single table mapping problem types to return values and post-processing notes:
+
+```markdown
+| Problem Type | Return Value | Post-Processing Notes |
+|---|---|---|
+| [type] | [what to return] | [edge cases, conversions] |
+```
+
+#### Section 6: Common Pitfalls & Solutions (8-10% of content)
+
+5-7 pitfalls, each with:
+- A descriptive name (e.g., "Pitfall 1: Sorting by the Wrong Criterion")
+- **Wrong code** in a Python code block with a comment explaining what goes wrong
+- **Why it fails** (concrete failing test case)
+- **Correct code** in a Python code block with the fix
+
+#### Section 7: Problem Recognition Framework (5% of content)
+
+A decision tree or flowchart in a code block showing:
+```
+"keyword in problem statement"  ->  Pattern name
+```
+
+Map 10-15 common problem phrasings to the specific pattern within this topic.
+
+#### Section 8: Interview Preparation Checklist (5% of content)
+
+Two sub-sections:
+
+**Before the Interview:**
+- Checkbox list of fundamentals to master
+- Checkbox list of templates to memorize
+- Checkbox list of specific LC problems to have solved
+
+**During the Interview:**
+- Numbered timeline: Clarify (30s) → Identify pattern (30s) → Explain approach (1 min) → Code (3-4 min) → Test (1-2 min) → Analyze complexity (30s)
+- Specific questions to ask and things to state for THIS topic
+
+#### Section 9: Quick Reference Cards (3-5% of content)
+
+Condensed reference cards with:
+- All templates in minimal form (just the skeleton, no comments)
+- Key formulas and relationships
+- "If you see X, do Y" quick-reference table
+
+#### Section 10: Complexity Reference (2-3% of content)
+
+Table of all patterns with their time/space complexity:
+
+```markdown
+| Pattern | Time | Space | Notes |
+|---|---|---|---|
+```
+
+#### Final Thoughts (1%)
+
+2-3 sentences of encouragement and a "key takeaway" quote in a blockquote.
+
+#### Appendix: Practice Problem Set (2%)
+
+Problems organized by difficulty tier (Starter → Intermediate → Advanced) with recommended order and brief notes on what each tests.
+
+---
+
+### STYLE REQUIREMENTS
+
+**Code:**
+- Python only
+- Clean, readable code with meaningful variable names
+- Comments explaining WHY, not WHAT
+- Show both wrong and right approaches in Pitfalls section
+
+**Visuals:**
+- ASCII diagrams for Visual Trace in every problem
+- Show state changes step by step
+- Use arrows, annotations, and clear labeling
+
+**Formatting:**
+- Use `<a name="anchor"></a>` for section anchors
+- Table of Contents at the top with anchor links
+- `---` horizontal rules between major sections
+- Code blocks with ```python for all solutions
+- Tables for all comparison/reference data
+
+**Tone:**
+- Direct and practical -- no filler
+- Every sentence should teach something
+- Use bold for key terms on first introduction
+- Use blockquotes for mental models and key insights
+
+---
+
+### DEPTH & LENGTH REQUIREMENTS
+
+- Target: 1,500-2,200 lines of markdown
+- 15-20 fully solved LeetCode problems with complete Python solutions
+- Each major pattern: 150-250 lines including 2-3 problems
+- Section 1 (Philosophy): 80-120 lines
+- Section 2 (Templates): 100-180 lines
+
+---
+
+### SPECIFIC CONTENT TO COVER
+
+**First Principles Analogies:**
+[FIRST_PRINCIPLES]
+
+**Patterns to cover:**
+[PATTERNS]
+
+**Problems to include (with LeetCode numbers):**
+[PROBLEMS]
+
+---
+
+### MY BACKGROUND
+
+- Software engineer preparing for senior-level FAANG interviews
+- Python for all code examples
+- I learn best with: "WHY" explanations, visual traces, and physical-world analogies
 - I want to MASTER this topic, not just memorize patterns
 
-**Success Criteria:**
+### SUCCESS CRITERIA
+
 After studying this handbook, I should be able to:
 1. Recognize the pattern within 30 seconds of reading a problem
-2. Choose the right template/approach confidently
-3. Code the solution from memory with correct complexity
+2. Choose the right template confidently
+3. Code the solution from memory
 4. Explain my approach clearly to an interviewer
 5. Handle variations and follow-up questions
 6. Avoid common pitfalls specific to this topic
 
 **Please begin creating "The Complete [TOPIC] Handbook" now.**
-
-Make it comprehensive, clear, and interview-focused. Take your time to ensure quality - this is a resource I'll use intensively for the next few weeks.
 
 ---
 
@@ -237,214 +242,91 @@ Make it comprehensive, clear, and interview-focused. Take your time to ensure qu
 
 ---
 
-# Quick Topic Customization Guide
+# Quick Topic Customization Reference
 
-## For Dynamic Programming:
-Replace [TOPIC] with: **Dynamic Programming**
-Replace [TOPIC_EXAMPLES] with:
-- Coin Change (LC 322)
-- House Robber (LC 198)
-- Longest Increasing Subsequence (LC 300)
-- Edit Distance (LC 72)
-- Knapsack variants
-- State machine DP (Best Time to Buy/Sell Stock)
+## All 17 Core Handbooks (Complete)
 
-Add to pattern list:
-- 1D DP (Linear problems)
-- 2D DP (Grid/string problems)
-- Knapsack (0/1, unbounded, bounded)
-- Longest Common Subsequence/Substring
-- State Machine DP
-- DP on Trees
-- Bitmask DP
-- Interval DP
+All handbooks below have been created and follow the structure above.
 
-## For BFS/DFS:
-Replace [TOPIC] with: **BFS and DFS (Graph Traversal)**
-Replace [TOPIC_EXAMPLES] with:
-- Number of Islands (LC 200)
-- Course Schedule (LC 207)
-- Word Ladder (LC 127)
-- Clone Graph (LC 133)
-- All paths source to target
-- Shortest path in binary matrix
+| # | Handbook File | Topic | Key Patterns |
+|---|---|---|---|
+| 1 | `sliding_window_handbook.md` | Sliding Window | Fixed window, variable window, counting subarrays, exactly-K trick |
+| 2 | `two_pointers_handbook.md` | Two Pointers | Opposite direction, same direction, fast/slow, partition |
+| 3 | `final_binary_search_handbook.md` | Binary Search | Standard search, boundary finding, search on answer space |
+| 4 | `dynamic_programming_handbook.md` | Dynamic Programming | 1D, 2D, knapsack, LCS, LIS, state machine |
+| 5 | `advanced_dp_handbook.md` | Advanced DP | Bitmask DP, interval DP, state machine DP, tree DP |
+| 6 | `trees_handbook.md` | Trees | Traversals, BST, path problems, construction, LCA |
+| 7 | `graphs_bfs_dfs_handbook.md` | Graphs (BFS/DFS) | Shortest path, cycle detection, topological sort, bipartite |
+| 8 | `backtracking_handbook.md` | Backtracking | Permutations, combinations, subsets, constraint satisfaction |
+| 9 | `heaps_handbook.md` | Heaps / Priority Queues | Top-K, merge K sorted, two heaps, task scheduling |
+| 10 | `intervals_handbook.md` | Intervals | Merge, insert, scheduling, overlap counting |
+| 11 | `tries_handbook.md` | Tries | Prefix trees, word search, autocomplete |
+| 12 | `union_find_handbook.md` | Union Find | Connected components, cycle detection, MST |
+| 13 | `bit_manipulation_handbook.md` | Bit Manipulation | XOR tricks, bit counting, masks, subset generation |
+| 14 | `monotonic_stack_queue_handbook.md` | Monotonic Stack/Queue | NGE, histogram, trapping rain water, sliding window max |
+| 15 | `greedy_algorithms_handbook.md` | Greedy Algorithms | Interval scheduling, jump game, digit manipulation, two-pass |
+| 16 | `divide_and_conquer_handbook.md` | Divide and Conquer | Merge sort variants, quick select, tree construction |
+| 17 | `matrix_grid_handbook.md` | Matrix / Grid | Islands, grid BFS/DFS, matrix DP, spiral, rotation |
 
-Add to pattern list:
-- Level-order BFS
-- Shortest path BFS
-- Multi-source BFS
-- DFS with backtracking
-- Cycle detection
-- Topological sort
-- Connected components
-- Bidirectional BFS
+## Example Customizations for New Topics
 
-## For Trees and Tries:
-Replace [TOPIC] with: **Trees and Tries**
-Replace [TOPIC_EXAMPLES] with:
-- Validate BST (LC 98)
-- Lowest Common Ancestor (LC 236)
-- Serialize and Deserialize Tree (LC 297)
-- Path Sum variants
-- Implement Trie (LC 208)
-- Word Search II (LC 212)
+### For Segment Trees / Fenwick Trees:
+```
+[TOPIC] = Segment Trees and Fenwick Trees (Binary Indexed Trees)
+[PHILOSOPHY] = Segment trees and Fenwick trees are not about storing data -- they're about precomputing range queries so that both updates and queries happen in O(log n) instead of O(n).
+[FIRST_PRINCIPLES] =
+- "The Corporate Org Chart": To find the total sales of a division, you don't ask every employee -- you ask the VP who already has their team's total. Segment trees store pre-aggregated results at each level.
+- "The Running Scoreboard": Instead of recalculating the total score from scratch after each play, the scoreboard adds the delta. Fenwick trees store cumulative deltas.
+[PATTERNS] = Range sum query, Range min/max query, Lazy propagation, Point update + range query, Range update + point query, 2D range queries
+[PROBLEMS] = LC 307 (Range Sum Query - Mutable), LC 315 (Count of Smaller Numbers After Self), LC 493 (Reverse Pairs), LC 218 (The Skyline Problem), LC 699 (Falling Squares), LC 1157 (Online Majority Element in Subarray)
+```
 
-Add to pattern list:
-- Tree traversals (inorder, preorder, postorder)
-- Level-order traversal
-- Path problems (path sum, path to node)
-- Tree construction (from traversals)
-- BST operations
-- Lowest common ancestor
-- Tree serialization
-- Trie construction
-- Trie search variants
+### For String Algorithms:
+```
+[TOPIC] = String Algorithms (KMP, Rabin-Karp, Z-Algorithm)
+[PHILOSOPHY] = String matching is not about comparing character by character -- it's about using preprocessing to skip impossible positions, turning O(n*m) into O(n+m).
+[FIRST_PRINCIPLES] =
+- "The License Plate Scanner": When looking for "ABC" in a stream of characters, if you see "ABD", you don't restart from scratch -- you already know "AB" matched, so you only need to check if the next character starts a new match from a known position.
+- "The Fingerprint Check": Instead of comparing strings character by character, compute a numeric "fingerprint" (hash) and compare numbers. Only do full comparison when fingerprints match.
+[PATTERNS] = KMP pattern matching, Rabin-Karp rolling hash, Z-algorithm, Longest palindromic substring (Manacher's), Suffix arrays, String hashing
+[PROBLEMS] = LC 28 (Find the Index of the First Occurrence), LC 214 (Shortest Palindrome), LC 459 (Repeated Substring Pattern), LC 5 (Longest Palindromic Substring), LC 1392 (Longest Happy Prefix), LC 686 (Repeated String Match)
+```
 
-## For Backtracking:
-Replace [TOPIC] with: **Backtracking**
-Replace [TOPIC_EXAMPLES] with:
-- Subsets (LC 78)
-- Permutations (LC 46)
-- Combination Sum (LC 39)
-- N-Queens (LC 51)
-- Palindrome Partitioning (LC 131)
-- Word Search (LC 79)
-
-Add to pattern list:
-- Subsets/Combinations
-- Permutations
-- Constraint satisfaction
-- Path finding
-- Board problems
-- Partition problems
-- Generate parentheses
-
-## For Sliding Window:
-Replace [TOPIC] with: **Sliding Window**
-Replace [TOPIC_EXAMPLES] with:
-- Longest Substring Without Repeating Characters (LC 3)
-- Minimum Window Substring (LC 76)
-- Longest Repeating Character Replacement (LC 424)
-- Max Consecutive Ones III (LC 1004)
-
-Add to pattern list:
-- Fixed window size
-- Variable window size
-- String problems
-- Two pointers + window
-- Window with constraints
-
-## For Two Pointers:
-Replace [TOPIC] with: **Two Pointers**
-Replace [TOPIC_EXAMPLES] with:
-- Two Sum II (LC 167)
-- 3Sum (LC 15)
-- Container With Most Water (LC 11)
-- Trapping Rain Water (LC 42)
-- Remove Duplicates (LC 26)
-
-Add to pattern list:
-- Opposite direction pointers
-- Same direction pointers (fast/slow)
-- Partition problems
-- Sum problems
-- Merge operations
-
-## For Heaps (Priority Queues):
-Replace [TOPIC] with: **Heaps and Priority Queues**
-Replace [TOPIC_EXAMPLES] with:
-- Kth Largest Element (LC 215)
-- Merge K Sorted Lists (LC 23)
-- Top K Frequent Elements (LC 347)
-- Find Median from Data Stream (LC 295)
-
-Add to pattern list:
-- K-way merge
-- Top K elements
-- Median finding (two heaps)
-- Meeting rooms / intervals
-- Task scheduling
-
-## For Intervals:
-Replace [TOPIC] with: **Interval Problems**
-Replace [TOPIC_EXAMPLES] with:
-- Merge Intervals (LC 56)
-- Insert Interval (LC 57)
-- Meeting Rooms II (LC 253)
-- Non-overlapping Intervals (LC 435)
-
-Add to pattern list:
-- Interval merging
-- Interval insertion
-- Interval intersection
-- Overlapping intervals
-- Interval scheduling
-
-## For Graphs (Advanced):
-Replace [TOPIC] with: **Advanced Graph Algorithms**
-Replace [TOPIC_EXAMPLES] with:
-- Dijkstra's Algorithm
-- Union-Find / Disjoint Set
-- Minimum Spanning Tree (Kruskal/Prim)
-- Floyd-Warshall
-- Bellman-Ford
-
-Add to pattern list:
-- Shortest path (single source)
-- Shortest path (all pairs)
-- Union-Find operations
-- Minimum spanning tree
-- Strongly connected components
-
-## For Bit Manipulation:
-Replace [TOPIC] with: **Bit Manipulation**
-Replace [TOPIC_EXAMPLES] with:
-- Single Number (LC 136)
-- Number of 1 Bits (LC 191)
-- Counting Bits (LC 338)
-- Sum of Two Integers (LC 371)
-
-Add to pattern list:
-- Basic operations (set, clear, toggle bits)
-- XOR properties
-- Bit masks
-- Power of two
-- Subset generation with bits
+### For Graph Advanced (Shortest Path):
+```
+[TOPIC] = Advanced Graph Algorithms (Shortest Path, MST, Network Flow)
+[PHILOSOPHY] = Advanced graph algorithms are not separate algorithms to memorize -- they're variations of BFS/DFS with different priority rules for which node to visit next.
+[FIRST_PRINCIPLES] =
+- "The GPS Navigator": Dijkstra's is like a GPS that always expands the closest unexplored intersection first. It never revisits a settled node because any other path to it would be longer.
+- "The Cheapest Flight Finder": Bellman-Ford is like checking all flights K times -- after K rounds, you've found the cheapest path using at most K flights. Negative prices (rebates) are fine.
+[PATTERNS] = Dijkstra's (single-source, non-negative), Bellman-Ford (negative edges), Floyd-Warshall (all-pairs), Kruskal's/Prim's MST, 0-1 BFS, A* search
+[PROBLEMS] = LC 743 (Network Delay Time), LC 787 (Cheapest Flights Within K Stops), LC 1514 (Path with Maximum Probability), LC 1584 (Min Cost to Connect All Points), LC 1631 (Path With Minimum Effort), LC 778 (Swim in Rising Water)
+```
 
 ---
 
 # Pro Tips for Using This Prompt
 
-1. **Start with fundamentals:** Do Binary Search, Two Pointers, Sliding Window first
-2. **Then move to core patterns:** BFS/DFS, Trees, DP
-3. **Finally advanced topics:** Graphs, Union-Find, Segment Trees
-
-4. **Customize the prompt:** Add your specific pain points or companies you're targeting
-
-5. **Iterate:** If first output isn't perfect, ask for:
-   - "Can you expand section X with more examples?"
-   - "Can you add more visual diagrams for pattern Y?"
-   - "Can you explain Z in simpler terms?"
-
-6. **Build a library:** Create handbooks for 8-10 core topics and you'll have comprehensive coverage
-
-7. **Use follow-up prompts:**
-   - "Create a practice schedule using these handbooks"
-   - "Generate a mock interview problem set from these patterns"
-   - "Create flashcards for quick review from this handbook"
+1. **Be specific about problems**: Always include LeetCode numbers. The more specific, the better the output.
+2. **First Principles matter most**: Good analogies in the philosophy section make the entire handbook more memorable.
+3. **Iterate after generation**: Ask for expansions:
+   - "Can you add 3 more problems to Pattern 2?"
+   - "Can you add a visual trace for the solution to LC 743?"
+   - "Can you expand the pitfalls section with 2 more common mistakes?"
+4. **Cross-reference**: After creating a handbook, update `algorithm_mnemonics_cheatsheet.md` with the key mnemonics and trigger words.
+5. **Quality check**: Verify all Python solutions are correct by testing them. Fix any issues before studying.
 
 ---
 
 # Expected Output Quality
 
-When you use this prompt, you should get:
-- 📖 8,000-15,000 word comprehensive guide
-- 🎯 4-8 master templates ready to memorize
-- 📊 10-15 distinct patterns fully explained
-- 💡 Clear "why" reasoning throughout
-- ✅ Complete code implementations
-- 📈 Complexity analysis for each approach
-- 🎓 Interview-ready format
-- 📝 50+ practice problems organized by pattern
+A well-generated handbook should have:
+- 1,500-2,200 lines of markdown
+- 3-6 master templates with decision matrix
+- 5-7 distinct patterns
+- 15-20 fully solved LeetCode problems with visual traces
+- 5-7 pitfalls with wrong/right code comparisons
+- Complete complexity reference table
+- Interview-ready checklist
 
-This is the same quality standard we achieved for the Binary Search handbook!
+This structure has been validated across all 17 existing handbooks.

@@ -1804,15 +1804,15 @@ Monotonic stack handles one-dimensional relationships beautifully. But for:
 
 ```
 Monotonic Stack Family
-├── Monotonic Decreasing Stack
+├── Monotonic Decreasing Stack (pop when current > top)
 │   ├── Next Greater Element (pop resolves NGE)
 │   ├── Previous Greater Element (top before push is PGE)
-│   └── Stock Span (previous greater variant)
-├── Monotonic Increasing Stack
+│   ├── Stock Span (previous greater variant)
+│   └── Trapping Rain Water (pop valleys when taller wall found)
+├── Monotonic Increasing Stack (pop when current < top)
 │   ├── Next Smaller Element (pop resolves NSE)
 │   ├── Previous Smaller Element (top before push is PSE)
-│   ├── Largest Rectangle (both NSE boundaries)
-│   └── Trapping Rain Water (valleys between walls)
+│   └── Largest Rectangle (both NSE boundaries)
 ├── Monotonic Deque
 │   ├── Sliding Window Maximum (decreasing deque)
 │   ├── Sliding Window Minimum (increasing deque)

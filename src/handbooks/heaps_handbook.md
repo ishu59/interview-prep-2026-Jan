@@ -337,7 +337,7 @@ def k_way_process(sources: list, process_func):
 | Merge K sorted | B | Min-heap |
 | Running median | C | Two heaps |
 | Sliding window max/min | D (lazy) or deque | Max/Min-heap |
-| Task scheduling | E | Min-heap by time |
+| Task scheduling | E | Max-heap by frequency (negate for heapq) |
 | Dijkstra's algorithm | E | Min-heap by distance |
 
 ---
