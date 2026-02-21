@@ -126,7 +126,7 @@ def opposite_ends(arr, condition):
     left = 0
     right = len(arr) - 1
 
-    while left < right:
+    while left < right:  # Why < not <=? See explanation below.
         # Evaluate current pair
         current = evaluate(arr[left], arr[right])
 
@@ -139,6 +139,17 @@ def opposite_ends(arr, condition):
 
     return None  # No valid pair found
 ```
+
+**Why `left < right` and not `left <= right`?**
+
+This is the most common conditional confusion in two pointers. The rule:
+
+- **`left < right`**: Stop when pointers meet. Use this when you need **two distinct elements** (a pair). When `left == right`, both pointers point to the same element — you can't pair an element with itself.
+- **`left <= right`**: Stop when pointers cross. Use this when you need to **process every element** (classification/partitioning). When `left == right`, that element still needs to be handled.
+
+> **Analogy:** Think of two people shaking hands. `left < right` says "stop when they meet — you can't shake hands with yourself." `left <= right` says "keep going until they've crossed — everyone must be accounted for."
+
+We'll see `left <= right` later in Sort Colors (Pattern 6A) where every element must be classified into a group.
 
 **Why this works:**
 - Each iteration eliminates one pointer position permanently
@@ -360,11 +371,20 @@ def threeSum(nums: list[int]) -> list[list[int]]:
     n = len(nums)
 
     for i in range(n - 2):
-        # Skip duplicates for the first element
+        # --- Duplicate skip for the first element ---
+        # Why `i > 0`? We must always process the FIRST occurrence.
+        # i=0 is always fresh, so the check only kicks in from i=1 onward.
+        # Why `nums[i] == nums[i-1]`? In a sorted array, duplicates are
+        # adjacent. If this value equals the previous, we already explored
+        # all triplets starting with this number — skip to avoid duplicates.
+        # Example: [-1, -1, 0, 1] → process first -1, skip second -1.
         if i > 0 and nums[i] == nums[i - 1]:
             continue
 
-        # Early termination: if smallest triplet > 0, no solution
+        # --- Early termination ---
+        # Since the array is sorted, nums[i] is the SMALLEST of the three
+        # numbers we'd pick. If the smallest is already > 0, all three
+        # must be positive, so they can never sum to 0. We can stop.
         if nums[i] > 0:
             break
 
@@ -378,25 +398,40 @@ def threeSum(nums: list[int]) -> list[list[int]]:
             if current_sum == target:
                 result.append([nums[i], nums[left], nums[right]])
 
-                # Skip duplicates for second and third elements
+                # --- Post-match duplicate skipping ---
+                # We found [nums[i], nums[left], nums[right]].
+                # Now skip over any duplicates of nums[left] and nums[right]
+                # to avoid adding the same triplet again.
+                #
+                # Why `left < right` guard inside these while loops?
+                # Without it, `left` could advance past `right` (or vice
+                # versa) and we'd read out-of-bounds or enter an invalid state.
                 while left < right and nums[left] == nums[left + 1]:
                     left += 1
                 while left < right and nums[right] == nums[right - 1]:
                     right -= 1
 
+                # After skipping duplicates, left and right still point to
+                # the LAST occurrence of their duplicate values. Advance both
+                # one more step to move to genuinely new values.
+                #
+                # Why move BOTH? If we only moved one pointer, the sum would
+                # change (one side bigger, one side same), so it can't equal
+                # target again with the previous partner — we'd waste time
+                # checking. Moving both maintains the search balance.
                 left += 1
                 right -= 1
             elif current_sum < target:
-                left += 1
+                left += 1   # Sum too small → need a bigger left value
             else:
-                right -= 1
+                right -= 1  # Sum too big → need a smaller right value
 
     return result
 ```
 
 **Why sort first?**
-1. Enables two-pointer technique
-2. Makes duplicate skipping easy (duplicates are adjacent)
+1. Enables two-pointer technique (monotonic elimination needs sorted order)
+2. Makes duplicate skipping easy (duplicates are adjacent after sorting)
 3. Allows early termination when `nums[i] > 0`
 
 **Why skip duplicates?**
@@ -404,6 +439,15 @@ def threeSum(nums: list[int]) -> list[list[int]]:
 [-1, -1, 0, 1, 2]
       ↑
 If we don't skip, we'd find [-1, 0, 1] twice!
+```
+
+**Why advance BOTH pointers after a match?**
+```
+After finding triplet [-2, 0, 2] with left→0 and right→2:
+  - If we only move left (to 1): -2 + 1 + 2 = 1 ≠ 0 (too big)
+  - If we only move right (to 1): -2 + 0 + 1 = -1 ≠ 0 (too small)
+  - The old pair (0, 2) can't form another valid triplet with nums[i]=-2
+  - So advancing both is correct AND efficient
 ```
 
 **Complexity:** Time O(n²), Space O(1) excluding output
@@ -428,12 +472,16 @@ def threeSumClosest(nums: list[int], target: int) -> int:
         while left < right:
             current_sum = nums[i] + nums[left] + nums[right]
 
-            # Update closest if this sum is better
+            # Update closest if this sum is nearer to target.
+            # abs() measures "distance" on the number line:
+            #   target=5, current_sum=3 → distance = |3-5| = 2
+            #   target=5, closest_sum=8 → distance = |8-5| = 3
+            #   2 < 3 → current_sum=3 is closer, so update.
             if abs(current_sum - target) < abs(closest_sum - target):
                 closest_sum = current_sum
 
             if current_sum == target:
-                return target  # Can't get closer than exact match!
+                return target  # Can't get closer than exact match! Distance=0.
             elif current_sum < target:
                 left += 1
             else:
@@ -464,7 +512,18 @@ def fourSum(nums: list[int], target: int) -> list[list[int]]:
             continue
 
         for j in range(i + 1, n - 2):
-            # Skip duplicates
+            # Skip duplicate values for the second element.
+            # Why `j > i + 1` (not `j > 0` or `j > 1`)?
+            # j starts at i+1 for each i. We must always process the
+            # FIRST j value for each i (that's j == i+1). The skip only
+            # kicks in for subsequent j values that repeat.
+            #
+            # Example: nums = [-2, -1, -1, 0, 1, 2], i=0 (nums[i]=-2)
+            #   j=1: nums[1]=-1, j==i+1 → process (first j for this i)
+            #   j=2: nums[2]=-1, j>i+1 and nums[2]==nums[1] → SKIP
+            #
+            # If we used `j > 0`, we'd skip nums[j]=-1 at j=2 even when
+            # i was different, potentially missing valid quadruplets.
             if j > i + 1 and nums[j] == nums[j - 1]:
                 continue
 
@@ -588,28 +647,39 @@ def trap(height: list[int]) -> int:
 
     while left < right:
         if height[left] < height[right]:
-            # Water level at left is determined by left_max
-            # (because we know there's something taller on the right)
+            # We know there's a wall on the right side that is TALLER
+            # than height[left] (namely height[right], or something even
+            # taller we saw earlier via right_max).
+            # So the water level at the left position is limited ONLY
+            # by the tallest wall on the left side (left_max).
             left += 1
             left_max = max(left_max, height[left])
+            # Why can't this be negative?
+            # We just set left_max = max(left_max, height[left]),
+            # so left_max >= height[left] is GUARANTEED.
+            # If height[left] IS the new max → adds 0 (no water on tallest bar).
+            # If height[left] < left_max → adds the trapped water above this bar.
             water += left_max - height[left]
         else:
-            # Water level at right is determined by right_max
+            # Mirror logic: there's a taller wall on the left side,
+            # so water level at right is determined by right_max.
             right -= 1
             right_max = max(right_max, height[right])
-            water += right_max - height[right]
+            water += right_max - height[right]  # Also never negative.
 
     return water
 ```
 
-**Why this works:**
+**Why this works — the key insight:**
 
-The key insight is: **water level at any position is limited by the SMALLER of the two maxes.**
+Water at any position = `min(max_left, max_right) - height[position]`. We don't need to know BOTH maxes — we only need the **limiting** (smaller) one.
 
 - If `height[left] < height[right]`:
   - We know `right_max >= height[right] > height[left]`
-  - So water at `left` is determined by `left_max` (the limiting factor)
-  - We can safely calculate water at `left` and move on
+  - So `min(left_max, right_max)` = `left_max` (left side is the bottleneck)
+  - We can safely calculate water at `left` using only `left_max`
+
+> **Analogy:** Imagine two walls of a bathtub. Water level is determined by the shorter wall. If you know the right wall is taller than the left, you only need to measure the left wall to know the water level — the right wall is irrelevant.
 
 ```
 [0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1]
@@ -627,14 +697,22 @@ Process right side:
 **Alternative: Stack-based approach** (for reference)
 ```python
 def trap_stack(height: list[int]) -> int:
-    stack = []  # Store indices
+    stack = []  # Stores indices; heights at these indices form a decreasing sequence
     water = 0
 
     for i, h in enumerate(height):
+        # When current bar is taller than stack top, we've found the
+        # RIGHT WALL of a potential water trap. Pop the valley bottom.
         while stack and height[stack[-1]] < h:
-            bottom = stack.pop()
+            bottom = stack.pop()  # This is the valley floor
+
             if not stack:
+                # No left wall exists — water flows off the left side.
+                # Like a cup with no left edge: can't hold water.
                 break
+
+            # Now stack[-1] is the LEFT WALL, i is the RIGHT WALL,
+            # and `bottom` is the valley floor between them.
             width = i - stack[-1] - 1
             bounded_height = min(h, height[stack[-1]]) - height[bottom]
             water += width * bounded_height
@@ -669,7 +747,15 @@ def removeDuplicates(nums: list[int]) -> int:
     slow = 1
 
     for fast in range(1, len(nums)):
-        # If current element differs from previous, it's unique
+        # Why `nums[fast] != nums[fast - 1]` (not `nums[fast] != nums[slow - 1]`)?
+        #
+        # Both work here because the array is sorted and we process
+        # left-to-right, but comparing with fast-1 is more intuitive:
+        # "Is this element different from the one right before it?"
+        # In a sorted array, if yes → it's a new unique value.
+        #
+        # (Note: In Remove Duplicates II / Pattern 3D, we compare
+        # with nums[slow - k] instead — that's a different technique.)
         if nums[fast] != nums[fast - 1]:
             nums[slow] = nums[fast]
             slow += 1
@@ -729,12 +815,23 @@ def removeElement(nums: list[int], val: int) -> int:
 def removeElement_swap(nums: list[int], val: int) -> int:
     left, right = 0, len(nums) - 1
 
+    # Why `<=` and not `<`?
+    # Unlike pair-finding (where left==right means "same element, no pair"),
+    # here we need to CLASSIFY every element as "keep" or "remove".
+    # When left == right, that element hasn't been classified yet.
+    # Example: [3], val=3 → left=0, right=0
+    #   With `<`:  loop doesn't run, returns 0... wait, that's correct by luck.
+    #   But [5], val=3 → left=0, right=0
+    #   With `<`:  loop doesn't run, returns 0 — WRONG! Should return 1.
+    #   With `<=`: checks nums[0]=5 ≠ 3, left++, returns 1 — correct.
     while left <= right:
         if nums[left] == val:
+            # Overwrite the unwanted element with the last unprocessed element.
+            # Don't advance left — the swapped-in value hasn't been checked yet.
             nums[left] = nums[right]
             right -= 1
         else:
-            left += 1
+            left += 1  # This element is good, move on.
 
     return left
 ```
@@ -846,22 +943,28 @@ def isPalindrome(s: str) -> bool:
     left, right = 0, len(s) - 1
 
     while left < right:
-        # Skip non-alphanumeric from left
+        # Skip non-alphanumeric from left.
+        # Why `left < right` inside this inner loop?
+        # Without it, left could advance PAST right when the string
+        # is mostly non-alphanumeric (e.g., "  ,. ").
+        # That would let us compare characters at invalid positions.
         while left < right and not s[left].isalnum():
             left += 1
 
-        # Skip non-alphanumeric from right
+        # Same guard for the right pointer.
         while left < right and not s[right].isalnum():
             right -= 1
 
-        # Compare characters (case-insensitive)
+        # After skipping, left and right both point to alphanumeric
+        # characters (or left >= right and loop will end).
+        # Compare case-insensitively: 'A' should equal 'a'.
         if s[left].lower() != s[right].lower():
             return False
 
         left += 1
         right -= 1
 
-    return True
+    return True  # All pairs matched (or string had < 2 alnum chars)
 ```
 
 **Why two pointers for palindrome?**
@@ -1065,26 +1168,58 @@ def sortColors(nums: list[int]) -> None:
     mid = 0           # Current element being processed
     high = len(nums) - 1  # Boundary for 2s (next position to place 2)
 
+    # Why `<=` and not `<`?
+    # The invariant says nums[mid:high+1] is the UNPROCESSED region.
+    # When mid == high, there's still ONE unprocessed element.
+    # Using `<` would leave it unclassified — a bug.
     while mid <= high:
         if nums[mid] == 0:
-            # Swap with low boundary, advance both
+            # Swap with low boundary, advance BOTH mid and low.
+            # Why is it safe to advance mid here?
+            # Everything between low and mid has already been processed.
+            # nums[low] is either:
+            #   - 1 (already classified, just in the wrong spot), or
+            #   - mid == low (swapping with itself, a no-op)
+            # Either way, the swapped-in value is already known-good.
             nums[low], nums[mid] = nums[mid], nums[low]
             low += 1
             mid += 1
         elif nums[mid] == 1:
-            # 1 is in correct region, just advance
+            # 1 belongs in the middle region — it's already in place.
             mid += 1
         else:  # nums[mid] == 2
-            # Swap with high boundary, only decrease high
-            # Don't advance mid - need to process swapped element
+            # Swap with high boundary, but do NOT advance mid.
             nums[mid], nums[high] = nums[high], nums[mid]
             high -= 1
 ```
 
-**Why not advance mid when swapping with high?**
-- When we swap `nums[mid]` with `nums[high]`, we don't know what value came from `high`
-- It could be 0, 1, or 2 — we need to process it
-- When swapping with `low`, we know `nums[low]` was either 1 or we haven't passed it yet
+**Why NOT advance mid when swapping with high?**
+
+The value that came from `nums[high]` is **unknown** — it could be 0, 1, or 2. We haven't looked at it yet. If we blindly advance mid, we'd skip it.
+
+**Concrete example showing the bug if we advanced mid:**
+```
+[2, 0, 1]
+ ↑     ↑
+mid   high
+
+nums[mid]=2 → swap with high → [1, 0, 2], high--
+                                 ↑  ↑
+                                mid high
+
+If we WRONGLY advance mid here:
+  mid → 1, but nums[0]=1 was never classified!
+  Result: [1, 0, 2] — the 1 at index 0 was skipped.
+
+If we CORRECTLY keep mid:
+  nums[mid]=1 → advance mid only.
+  nums[mid]=0 → swap with low, advance both.
+  Result: [0, 1, 2] ✓
+```
+
+**Why IS it safe to advance mid when swapping with low?**
+
+`mid` is always >= `low` (mid starts at low and only moves forward). Everything between `low` and `mid` has already been processed — it's all 1s (0s were swapped left, 2s were swapped right). So the value coming from `nums[low]` is always 1 or mid==low (self-swap). Either way, we know what it is.
 
 **Invariant:**
 - `nums[0:low]` contains all 0s
@@ -1161,14 +1296,27 @@ def hasCycle(head: ListNode) -> bool:
     slow = head
     fast = head
 
+    # Why check BOTH `fast` and `fast.next`?
+    # fast takes 2 steps per iteration: fast = fast.next.next
+    #
+    # - `fast` could be None:
+    #     List [1 → 2 → None]. After fast = 2.next.next = None.
+    #     Next iteration, `fast.next` would crash (None has no .next).
+    #
+    # - `fast.next` could be None:
+    #     List [1 → 2 → 3 → None]. After fast = 3, fast.next = None.
+    #     Doing fast.next.next would crash.
+    #
+    # Together they guarantee we can safely take 2 steps.
+    # If either is None → no cycle (fast reached the end of the list).
     while fast and fast.next:
         slow = slow.next        # Move 1 step
         fast = fast.next.next   # Move 2 steps
 
         if slow == fast:
-            return True
+            return True  # Fast lapped slow → cycle exists
 
-    return False
+    return False  # Fast reached end → no cycle
 ```
 
 **Why they meet if cycle exists:**
@@ -1203,6 +1351,13 @@ def detectCycle(head: ListNode) -> ListNode:
         if slow == fast:
             break
     else:
+        # Python's while/else: the `else` block runs ONLY if the loop
+        # finished normally (condition became False). It does NOT run
+        # if we exited via `break`.
+        #
+        # So:
+        #   - `break` hit → cycle found → skip else → continue to Phase 2
+        #   - loop ended naturally → fast hit None → no cycle → return None
         return None  # No cycle
 
     # Phase 2: Find cycle start
@@ -1258,7 +1413,25 @@ def middleNode(head: ListNode) -> ListNode:
 ```python
 def middleNode_first(head: ListNode) -> ListNode:
     slow = fast = head
-    while fast.next and fast.next.next:  # Different condition
+    # Standard condition `fast and fast.next` → slow lands on SECOND middle.
+    # This condition `fast.next and fast.next.next` → slow lands on FIRST middle.
+    #
+    # Why? This stops ONE step earlier. Trace with [1, 2, 3, 4]:
+    #
+    #   Standard (`fast and fast.next`):
+    #     Start: slow=1, fast=1
+    #     Step 1: slow=2, fast=3 → fast.next=4 (truthy) → continue
+    #     Step 2: slow=3, fast=None → fast is None → stop
+    #     Returns 3 (second middle) ← one step too far for "first middle"
+    #
+    #   This variant (`fast.next and fast.next.next`):
+    #     Start: slow=1, fast=1
+    #     Step 1: slow=2, fast=3 → fast.next=4, fast.next.next=None → stop
+    #     Returns 2 (first middle) ✓
+    #
+    # Note: We check fast.NEXT first (not fast) because we know fast
+    # is never None here — it was valid when we entered the loop.
+    while fast.next and fast.next.next:
         slow = slow.next
         fast = fast.next.next
     return slow
@@ -1285,7 +1458,13 @@ def removeNthFromEnd(head: ListNode, n: int) -> ListNode:
     for _ in range(n + 1):
         fast = fast.next
 
-    # Move both until fast reaches end
+    # Move both at the SAME speed (1 step each) until fast hits None.
+    #
+    # Why just `fast` (not `fast and fast.next`)?
+    # Unlike cycle detection, both pointers move at speed 1 here.
+    # We only do `fast = fast.next` (one step, not two), so we only
+    # need to check that fast itself isn't None. There's no risk of
+    # accessing .next on a None — we check before stepping.
     while fast:
         slow = slow.next
         fast = fast.next
@@ -1663,3 +1842,45 @@ while i < len(arr1) and j < len(arr2):
 5. Attempt Trapping Rain Water as advanced challenge
 
 Good luck with your interview preparation!
+
+---
+
+## Appendix: Conditional Quick Reference
+
+Every key conditional used in this handbook, explained in one place.
+
+### Array Two-Pointer Conditionals
+
+| Condition | Meaning | When to Use |
+|-----------|---------|-------------|
+| `while left < right` | Stop when pointers meet. Need two **distinct** elements. | Pair-finding: Two Sum, Container, Palindrome |
+| `while left <= right` | Stop when pointers cross. Must **process every element**. | Classification: Remove Element (swap variant), Sort Colors |
+| `if current < target` → `left += 1` | Sum too small → need larger value from sorted array. | All sum-based opposite-end problems |
+| `if current > target` → `right -= 1` | Sum too big → need smaller value from sorted array. | All sum-based opposite-end problems |
+| `if i > 0 and nums[i] == nums[i-1]` | Skip duplicate first-element. `i > 0` ensures first occurrence is always processed. | N-Sum duplicate avoidance |
+| `if j > i + 1 and nums[j] == nums[j-1]` | Skip duplicate second-element. `j > i+1` ensures first j per i is processed. | 4Sum duplicate avoidance |
+| `if nums[i] > 0: break` | In sorted array, if smallest of 3 is positive, sum can't be 0. | 3Sum early termination |
+| `if nums[fast] != val` | Keep elements that don't match removal target. | Remove Element (Template B) |
+| `if nums[fast] != nums[fast-1]` | In sorted array, detect first occurrence of new value. | Remove Duplicates |
+| `if nums[fast] != nums[slow-k]` | Allow at most k duplicates by checking k positions back in result. | Remove Duplicates II |
+| `if nums[mid] == 0/1/2` | Three-way classification into regions. | Sort Colors (Dutch National Flag) |
+
+### Linked List Two-Pointer Conditionals
+
+| Condition | Meaning | When to Use |
+|-----------|---------|-------------|
+| `while fast and fast.next` | Can safely take 2 steps. `fast` guards None; `fast.next` guards last node. | Cycle detection, find middle (standard) |
+| `while fast.next and fast.next.next` | Stops one step earlier than standard. Returns **first** middle in even-length list. | Find middle (first-middle variant) |
+| `while fast` | Can safely take 1 step. Both pointers move at same speed. | Remove Nth from End (gap technique) |
+| `if slow == fast` | Fast lapped slow on the cycle track → cycle exists. | Cycle detection |
+| `while slow != fast` (Phase 2) | One pointer from head, one from meeting point, same speed → they meet at cycle start. | Find cycle entry point |
+| `while/else` | `else` runs only if loop ended naturally (no `break`). | Cycle detection with entry finding |
+
+### Water / Area Conditionals
+
+| Condition | Meaning | When to Use |
+|-----------|---------|-------------|
+| `if height[left] < height[right]` | Left wall is shorter → left side is the bottleneck → process left. | Container With Most Water, Trapping Rain Water |
+| `left_max - height[left]` | Never negative because `left_max = max(left_max, height[left])` guarantees `left_max >= height[left]`. | Trapping Rain Water (water at position) |
+| `while stack and height[stack[-1]] < h` | Found a right wall taller than valley → can compute trapped water. | Trapping Rain Water (stack approach) |
+| `if not stack: break` | No left wall exists after popping valley → water flows off the edge. | Trapping Rain Water (stack approach) |
