@@ -341,13 +341,18 @@ def eraseOverlapIntervals(intervals: list[list[int]]) -> int:
     if not intervals:
         return 0
 
-    # Sort by end time (greedy: earliest end first)
+    # Why sort by END time (not start time)?
+    # Picking the interval that ENDS earliest leaves the most room
+    # for future intervals — greedy choice that's provably optimal.
     intervals.sort(key=lambda x: x[1])
 
     kept = 1
     last_end = intervals[0][1]
 
     for i in range(1, len(intervals)):
+        # Why >= (not just >)? Two intervals like [1,2] and [2,3] share
+        # endpoint 2, but they do NOT overlap — one ends as the other starts.
+        # Using > would incorrectly skip valid non-overlapping pairs.
         if intervals[i][0] >= last_end:
             # No overlap, keep this interval
             kept += 1
@@ -401,13 +406,22 @@ def findMinArrowShots(points: list[list[int]]) -> int:
     if not points:
         return 0
 
-    # Sort by end position
+    # Why sort by END position? Same reasoning as activity selection:
+    # placing an arrow at the earliest-ending balloon's end ensures
+    # it bursts as many overlapping balloons as possible.
     points.sort(key=lambda x: x[1])
 
     arrows = 1
+    # Place the first arrow at the end of the first balloon —
+    # this is the rightmost point that still bursts it.
     arrow_pos = points[0][1]
 
     for i in range(1, len(points)):
+        # Why > (strict) instead of >=?
+        # Unlike non-overlapping intervals, here touching counts as overlap:
+        # an arrow at x bursts balloon [x_start, x_end] if x_start <= x <= x_end.
+        # So if points[i][0] == arrow_pos, the current arrow still bursts it.
+        # We only need a new arrow when the balloon starts AFTER the arrow position.
         if points[i][0] > arrow_pos:
             # This balloon is not burst by current arrow
             arrows += 1
@@ -457,12 +471,22 @@ def merge(intervals: list[list[int]]) -> list[list[int]]:
     if not intervals:
         return []
 
+    # Why sort by START time (not end time)?
+    # For merging, we need to process intervals in the order they begin
+    # so we can detect and extend overlaps as a contiguous sweep.
     intervals.sort(key=lambda x: x[0])
     merged = [intervals[0]]
 
     for i in range(1, len(intervals)):
+        # Why <= (not <)? Intervals [1,3] and [3,5] touch at point 3.
+        # They should merge into [1,5] because they share boundary 3.
+        # Using < would leave them separate, which is wrong for most
+        # "merge intervals" problem definitions.
         if intervals[i][0] <= merged[-1][1]:
-            # Overlaps: extend the end
+            # Overlaps: extend the end.
+            # Why max() instead of just assigning intervals[i][1]?
+            # The new interval might be entirely contained within the last one.
+            # e.g., merged[-1]=[1,10], intervals[i]=[2,5] -> end stays 10.
             merged[-1][1] = max(merged[-1][1], intervals[i][1])
         else:
             # No overlap: start new interval
@@ -524,9 +548,18 @@ def canJump(nums: list[int]) -> bool:
     farthest = 0
 
     for i in range(len(nums)):
+        # Why "i > farthest" means unreachable:
+        # farthest tracks the maximum index reachable from any index [0..i-1].
+        # If the current index i exceeds that, there is a gap — no earlier
+        # position could jump far enough to reach i, so we are stuck.
         if i > farthest:
             return False
+        # Why max() instead of just assigning i + nums[i]?
+        # A previous position might already reach farther than i + nums[i].
+        # We must keep the best reach seen so far, not just the current one.
         farthest = max(farthest, i + nums[i])
+        # Why >= (not >)? The last index is len(nums)-1. If farthest
+        # equals it exactly, we can land on it — reaching it is enough.
         if farthest >= len(nums) - 1:
             return True
 
@@ -577,16 +610,26 @@ Answer: 2 jumps
 **Solution:**
 ```python
 def jump(nums: list[int]) -> int:
+    # Why <= 1? A single-element array means we are already at the last
+    # index — no jumps needed. Also handles empty arrays safely.
     if len(nums) <= 1:
         return 0
 
     jumps = 0
-    current_end = 0
-    farthest = 0
+    current_end = 0   # rightmost index reachable with 'jumps' jumps
+    farthest = 0      # rightmost index reachable with 'jumps + 1' jumps
 
+    # Why len(nums) - 1 (not len(nums))?
+    # We never need to "jump from" the last index. If we reach it, we are done.
+    # Including the last index would count an extra unnecessary jump.
     for i in range(len(nums) - 1):
         farthest = max(farthest, i + nums[i])
 
+        # Why "i == current_end" triggers a jump:
+        # current_end is the boundary of the current BFS "level."
+        # When i reaches this boundary, we have explored every position
+        # reachable with the current number of jumps, so we MUST take
+        # another jump to go farther. farthest becomes the new boundary.
         if i == current_end:
             jumps += 1
             current_end = farthest
@@ -643,24 +686,35 @@ Round 3: current coverage ends at 9
 **Solution:**
 ```python
 def videoStitching(clips: list[list[int]], time: int) -> int:
-    # Sort by start time, then by end time descending
+    # Why sort by start time, then by end time descending?
+    # Start time first ensures we consider clips in order of where they begin.
+    # Descending end time is a minor optimization: among clips with the same
+    # start, the longest one comes first and will be picked by the max() below.
     clips.sort(key=lambda x: (x[0], -x[1]))
 
     count = 0
     coverage = 0
     i = 0
 
+    # Why "coverage < time"? We need to cover [0, time]. Once coverage
+    # reaches or exceeds 'time', the entire interval is covered.
     while coverage < time:
         farthest = coverage
 
-        # Among all clips starting at or before current coverage,
-        # find the one that extends farthest
+        # Why "clips[i][0] <= coverage"?
+        # A clip can extend our coverage only if it starts at or before
+        # our current coverage endpoint — otherwise there is a gap.
+        # Among all such overlapping clips, we greedily pick the one
+        # that reaches farthest (maximizes coverage extension).
         while i < len(clips) and clips[i][0] <= coverage:
             farthest = max(farthest, clips[i][1])
             i += 1
 
+        # Why "farthest == coverage" means impossible:
+        # If no clip could extend coverage beyond its current value,
+        # there is an uncoverable gap — no future clip can help either,
+        # since they all start after coverage.
         if farthest == coverage:
-            # No clip can extend coverage
             return -1
 
         coverage = farthest
@@ -718,13 +772,23 @@ from collections import Counter
 def leastInterval(tasks: list[str], n: int) -> int:
     count = Counter(tasks)
     max_freq = max(count.values())
-    # How many tasks have the maximum frequency
+    # How many tasks have the maximum frequency?
+    # We need this because all max-frequency tasks occupy the final "partial" cycle.
+    # Why "if freq == max_freq"? Only tasks matching the peak frequency
+    # appear in every cycle including the last one — others fit in the gaps.
     max_count = sum(1 for freq in count.values() if freq == max_freq)
 
-    # Frame: (max_freq - 1) full cycles of length (n + 1), plus the final batch
+    # Why (max_freq - 1) * (n + 1) + max_count?
+    # Visualize: the most frequent task creates (max_freq - 1) full cycles,
+    # each of length (n + 1) to respect cooldown. E.g., A _ _ | A _ _ | A
+    # has (3-1)=2 full cycles of size (2+1)=3, plus 1 final A.
+    # max_count accounts for all tasks tied at max frequency in that last slot.
     result = (max_freq - 1) * (n + 1) + max_count
 
-    # If tasks fill all gaps and more, no idle time needed
+    # Why max(result, len(tasks))?
+    # When there are many distinct tasks, all idle slots get filled and we
+    # may even need more time than the formula predicts. In that case, the
+    # answer is simply the total number of tasks (no idle time at all).
     return max(result, len(tasks))
 ```
 
@@ -778,10 +842,15 @@ def reorganizeString(s: str) -> str:
 
     # Check if possible
     max_freq = max(count.values())
+    # Why (len(s) + 1) // 2?
+    # In a string of length n, you can place at most ceil(n/2) copies of one
+    # character in non-adjacent positions (every other slot: positions 0,2,4,...).
+    # If any character exceeds this, no valid arrangement exists.
     if max_freq > (len(s) + 1) // 2:
         return ""
 
-    # Max-heap of (-frequency, character)
+    # Max-heap of (-frequency, character).
+    # Negative because Python's heapq is a min-heap; negating makes it a max-heap.
     heap = [(-freq, char) for char, freq in count.items()]
     heapq.heapify(heap)
 
@@ -789,15 +858,22 @@ def reorganizeString(s: str) -> str:
     prev_freq, prev_char = 0, ''
 
     while heap:
+        # Always pop the most frequent available character.
+        # This is greedy: placing the most frequent character first
+        # reduces the risk of being stuck with adjacent duplicates later.
         freq, char = heapq.heappop(heap)
         result.append(char)
 
-        # Push back the previous character if it still has remaining count
+        # Why push the PREVIOUS character back now (not the current one)?
+        # We delay re-inserting a character by one step to guarantee it is
+        # not placed in two consecutive positions. The character we just
+        # placed becomes "prev" and waits one round before being eligible again.
         if prev_freq < 0:
             heapq.heappush(heap, (prev_freq, prev_char))
 
-        # Update previous (used one occurrence, so freq moves toward 0)
-        prev_freq = freq + 1  # freq is negative, so +1 means "one fewer remaining"
+        # Update previous (used one occurrence, so freq moves toward 0).
+        # freq is negative, so +1 means "one fewer remaining."
+        prev_freq = freq + 1
         prev_char = char
 
     return ''.join(result)
@@ -851,13 +927,20 @@ Why not merge 4+3=7 first?
 import heapq
 
 def connectSticks(sticks: list[int]) -> int:
+    # Why <= 1? Zero or one stick means no connections needed.
     if len(sticks) <= 1:
         return 0
 
     heapq.heapify(sticks)
     total_cost = 0
 
+    # Why "len(sticks) > 1"? We need at least two sticks to merge.
+    # When only one stick remains, all sticks have been connected.
     while len(sticks) > 1:
+        # Why always pop the two SMALLEST?
+        # Each merged stick gets re-added and will contribute to future merge costs.
+        # Merging the smallest first minimizes how many times large values
+        # get re-summed — this is the Huffman coding insight.
         first = heapq.heappop(sticks)
         second = heapq.heappop(sticks)
         combined = first + second
@@ -918,7 +1001,10 @@ Answer: 3
 **Solution:**
 ```python
 def canCompleteCircuit(gas: list[int], cost: list[int]) -> int:
-    # If total gas < total cost, impossible
+    # Why check total gas < total cost?
+    # This is the global feasibility test. If the total fuel available across
+    # ALL stations is less than the total fuel needed, no starting point can
+    # work — you will always run out somewhere on the circuit.
     if sum(gas) < sum(cost):
         return -1
 
@@ -928,9 +1014,16 @@ def canCompleteCircuit(gas: list[int], cost: list[int]) -> int:
     for i in range(len(gas)):
         tank += gas[i] - cost[i]
 
+        # Why "tank < 0" triggers a reset:
+        # If the running tank goes negative, we cannot reach station i+1
+        # from the current start. Moreover, no station between start and i
+        # can work either — because we arrived at each of those with a
+        # non-negative tank and still ended up negative at i.
+        # Why reset tank to 0 (not carry the deficit)?
+        # We are "restarting" from station i+1 with a fresh empty tank.
+        # The global check above guarantees that the deficit we abandon
+        # here will be compensated by surplus elsewhere on the circuit.
         if tank < 0:
-            # Can't reach station i+1 from current start
-            # No station between start and i works either
             start = i + 1
             tank = 0
 

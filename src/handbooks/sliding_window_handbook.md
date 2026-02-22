@@ -138,6 +138,10 @@ def fixed_window(arr: list, k: int):
     result = evaluate(window_state)
 
     # Slide: Remove left element, add right element
+    # Why `range(k, n)` and not `range(k, n+1)`?
+    # The last valid index is n-1. When right = n-1, the window is
+    # [n-1-k+1, n-1], which is the last possible window. right = n would
+    # be out of bounds.
     for right in range(k, n):
         left = right - k  # Element leaving the window
 
@@ -193,16 +197,28 @@ def variable_window(arr: list, condition):
     window_state = initial_state()
     result = initial_result()
 
+    # Why `range(len(arr))` (i.e., right < len(arr)) and not `right <= len(arr)`?
+    # `right` is an index into the array. The last valid index is len(arr)-1.
+    # Using `<=` would make right = len(arr), which is out of bounds.
     for right in range(len(arr)):
         # EXPAND: Add arr[right] to window
         add_to_state(window_state, arr[right])
 
         # SHRINK: While window is invalid, remove from left
+        # Why `while` and not `if`? One removal may not be enough to restore
+        # validity. Example: window has 5 distinct chars and limit is 2 --
+        # you may need to remove several elements from the left before the
+        # window becomes valid again.
+        # Why can't this loop run forever? Because left can never pass right.
+        # Each iteration removes one element and increments left. Once
+        # left > right the window is empty, which is always valid.
         while not is_valid(window_state):
             remove_from_state(window_state, arr[left])
             left += 1
 
         # UPDATE: Window [left, right] is now valid
+        # Why is the window guaranteed valid here? The while-loop above
+        # keeps shrinking until validity is restored (or the window is empty).
         result = update_result(result, left, right)
 
     return result
@@ -244,6 +260,10 @@ def exactly_k(arr: list, k: int) -> int:
 
 def at_most(arr: list, k: int) -> int:
     """Count subarrays with at most k of something."""
+    # Why check k < 0? When computing exactly(k) = atMost(k) - atMost(k-1),
+    # if k=0 we call atMost(-1). Without this guard, the while-loop below
+    # would shrink forever (window_state > -1 is almost always true),
+    # making left shoot past right and producing garbage counts.
     if k < 0:
         return 0
 
@@ -256,11 +276,20 @@ def at_most(arr: list, k: int) -> int:
         window_state = update_add(window_state, arr[right])
 
         # Shrink if needed
+        # Why `>` and not `>=`? We want "at most k", meaning k itself is
+        # still valid. We only shrink when we EXCEED k.
         while window_state > k:
             window_state = update_remove(window_state, arr[left])
             left += 1
 
-        # Count all valid subarrays ending at right
+        # Count all valid subarrays ending at right.
+        # Why `right - left + 1`?
+        # Every subarray [i, right] where left <= i <= right is valid
+        # (it's a subset of the valid window [left, right]).
+        # The number of such starting positions is right - left + 1.
+        # Why +1? Because both endpoints are inclusive: the count of
+        # integers from left to right inclusive is right - left + 1.
+        # Think of it as: [3,3] has 1 element (3-3+1=1), not 0.
         count += right - left + 1
 
     return count
@@ -386,17 +415,25 @@ def maxSlidingWindow(nums: list[int], k: int) -> list[int]:
     dq = deque()  # Store indices, values are monotonically decreasing
 
     for i in range(len(nums)):
-        # Remove elements outside current window
+        # Remove elements outside current window.
+        # Why `dq[0] <= i - k`? The window covers indices [i-k+1, i].
+        # Any index <= i-k is to the LEFT of the window, so it's stale.
+        # Example: k=3, i=5 -> window is [3,4,5], so index 2 (<=5-3) is out.
         while dq and dq[0] <= i - k:
             dq.popleft()
 
-        # Remove smaller elements (they can never be max)
+        # Remove smaller elements (they can never be max).
+        # Why `<` and not `<=`? Equal elements are kept because they might
+        # outlast the current front of the deque. Keeping duplicates is safe
+        # and avoids losing a valid maximum.
         while dq and nums[dq[-1]] < nums[i]:
             dq.pop()
 
         dq.append(i)
 
-        # Window is complete, record maximum
+        # Why `i >= k - 1` and not `i >= k`?
+        # The first complete window of size k ends at index k-1 (indices
+        # 0 through k-1). So we start recording results from i = k-1.
         if i >= k - 1:
             result.append(nums[dq[0]])
 
@@ -461,6 +498,8 @@ def findAnagrams(s: str, p: str) -> list[int]:
         result.append(0)
 
     # Slide window
+    # Why start at len(p)? Indices 0..len(p)-1 are the first window,
+    # already built above. Now we slide one character at a time.
     for i in range(len(p), len(s)):
         # Add new character
         window_count[s[i]] += 1
@@ -468,10 +507,17 @@ def findAnagrams(s: str, p: str) -> list[int]:
         # Remove old character
         old_char = s[i - len(p)]
         window_count[old_char] -= 1
+        # Why `del` when count reaches 0? Python's Counter equality check
+        # considers {a:1, b:0} != {a:1}. If we leave zero-count keys,
+        # the `==` comparison with p_count would fail even when the
+        # frequencies actually match. Deleting zeros keeps both dicts
+        # in the same "shape" for a clean equality check.
         if window_count[old_char] == 0:
             del window_count[old_char]
 
-        # Check if anagram
+        # Check if anagram.
+        # Why `i - len(p) + 1`? The window currently spans
+        # [i - len(p) + 1, i], so the start index is i - len(p) + 1.
         if window_count == p_count:
             result.append(i - len(p) + 1)
 
@@ -495,13 +541,23 @@ def findAnagrams_optimized(s: str, p: str) -> list[int]:
         char = s[i]
         if char in p_count:
             p_count[char] -= 1
+            # Why check `== 0` specifically? p_count[char] tracks the
+            # "debt" for this character. When it hits 0, the window has
+            # exactly the right count for this char -- one more match.
             if p_count[char] == 0:
                 matches += 1
 
-        # Remove s[i - len(p)] from window
+        # Remove s[i - len(p)] from window.
+        # Why `i >= len(p)` and not `i >= len(p) - 1`?
+        # The first full window occupies indices [0, len(p)-1]. We only
+        # start removing the leftmost element when adding index len(p),
+        # because that is the first time the window exceeds size len(p).
         if i >= len(p):
             old_char = s[i - len(p)]
             if old_char in p_count:
+                # Why check `== 0` BEFORE incrementing? If the count is
+                # currently 0, this char was perfectly matched. Adding 1
+                # will break that match, so we decrement matches first.
                 if p_count[old_char] == 0:
                     matches -= 1
                 p_count[old_char] += 1
@@ -536,7 +592,15 @@ def lengthOfLongestSubstring(s: str) -> int:
     for right in range(len(s)):
         char = s[right]
 
-        # If char was seen and is in current window, shrink
+        # If char was seen and is in current window, shrink.
+        # Why TWO conditions joined by `and`?
+        # 1. `char in char_index` -- the character was seen before.
+        # 2. `char_index[char] >= left` -- that previous occurrence is
+        #    INSIDE our current window [left, right]. If the old index
+        #    is to the LEFT of `left`, it was already evicted and is
+        #    irrelevant -- we don't want to accidentally move left backward.
+        # Why `char_index[char] + 1`? We jump left past the duplicate,
+        # landing on the character right after it, so the window is clean.
         if char in char_index and char_index[char] >= left:
             left = char_index[char] + 1
 
@@ -555,7 +619,11 @@ def lengthOfLongestSubstring_set(s: str) -> int:
     max_length = 0
 
     for right in range(len(s)):
-        # Shrink until no duplicate
+        # Shrink until no duplicate.
+        # Why `while` and not `if`? The duplicate of s[right] might not
+        # be at position `left`. We must keep removing from the left until
+        # we've removed the conflicting character. Example: window "abcd"
+        # and s[right]='b' -- we remove 'a' first, then 'b', then stop.
         while s[right] in char_set:
             char_set.remove(s[left])
             left += 1
@@ -605,14 +673,22 @@ def lengthOfLongestSubstringKDistinct(s: str, k: int) -> int:
     distinct = 0
 
     for right in range(len(s)):
-        # Add s[right]
+        # Add s[right].
+        # Why check `== 0` before incrementing? If this character's count
+        # is currently 0, it's not in the window yet -- adding it
+        # introduces a NEW distinct character, so we increment `distinct`.
         if char_count[s[right]] == 0:
             distinct += 1
         char_count[s[right]] += 1
 
-        # Shrink while too many distinct
+        # Shrink while too many distinct.
+        # Why `>` and not `>=`? We want "at most k" distinct, so having
+        # exactly k is still valid. We only shrink when we EXCEED k.
         while distinct > k:
             char_count[s[left]] -= 1
+            # Why check `== 0` after decrementing? If the count just
+            # dropped to 0, this character has been fully removed from the
+            # window -- one fewer distinct character.
             if char_count[s[left]] == 0:
                 distinct -= 1
             left += 1
@@ -663,7 +739,16 @@ def characterReplacement(s: str, k: int) -> int:
         char_count[s[right]] += 1
         max_count = max(max_count, char_count[s[right]])
 
-        # Window invalid if we need more than k replacements
+        # Window invalid if we need more than k replacements.
+        # Why `window_size - max_count`? To make all characters in the
+        # window the same, we keep the most frequent character and replace
+        # the rest. The "rest" is window_size - max_count characters.
+        # Why `if` and not `while`? This is a deliberate optimization.
+        # We only shrink by 1 because we only grew by 1 (adding s[right]).
+        # The window can be at most 1 character too large, so a single
+        # shrink restores validity. This also means the window size never
+        # decreases -- it either stays the same or grows, acting as a
+        # "high water mark" that records our best length so far.
         window_size = right - left + 1
         if window_size - max_count > k:
             # Shrink by 1
@@ -704,8 +789,13 @@ def longestOnes(nums: list[int], k: int) -> int:
         if nums[right] == 0:
             zeros += 1
 
-        # Shrink while too many zeros
+        # Shrink while too many zeros.
+        # Why `zeros > k` and not `zeros >= k`? We're allowed to flip
+        # AT MOST k zeros. Having exactly k flipped zeros is valid.
+        # We only shrink when we've used MORE flips than allowed.
         while zeros > k:
+            # Only decrement zeros if the element leaving is a 0.
+            # Removing a 1 doesn't change our flip count.
             if nums[left] == 0:
                 zeros -= 1
             left += 1
@@ -751,12 +841,21 @@ def minSubArrayLen(target: int, nums: list[int]) -> int:
     for right in range(len(nums)):
         current_sum += nums[right]
 
-        # Shrink while valid (sum >= target)
+        # Shrink while valid (sum >= target).
+        # Why shrink when VALID (not invalid)?
+        # For "shortest" problems, a valid window means we HAVE a candidate.
+        # We record its length, then try to make it shorter by removing
+        # from the left. We keep shrinking as long as the window stays valid
+        # because an even shorter valid window would be a better answer.
+        # This is the opposite of "longest" problems where we shrink when
+        # INVALID to restore validity.
         while current_sum >= target:
             min_length = min(min_length, right - left + 1)
             current_sum -= nums[left]
             left += 1
 
+    # Why this ternary? If min_length was never updated from infinity,
+    # no valid subarray exists, so we return 0 per the problem spec.
     return min_length if min_length != float('inf') else 0
 ```
 
@@ -812,10 +911,19 @@ def minWindow(s: str, t: str) -> str:
         char = s[right]
         window_count[char] = window_count.get(char, 0) + 1
 
+        # Why `== t_count[char]` specifically (not `>=`)?
+        # We only increment `formed` at the exact moment this character's
+        # count REACHES the required frequency. If we already had enough
+        # (count was already >= required), formed was already incremented
+        # for this character on a previous step. Using `>=` would
+        # double-count.
         if char in t_count and window_count[char] == t_count[char]:
             formed += 1
 
-        # Shrink while valid
+        # Shrink while valid (same "shortest" pattern as Pattern 3A).
+        # Why `formed == required`? This means every unique character in t
+        # has met its required frequency in our window -- the window
+        # contains all characters of t. Time to record and try shorter.
         while formed == required:
             # Update minimum
             if right - left + 1 < min_len:
@@ -825,6 +933,10 @@ def minWindow(s: str, t: str) -> str:
             # Remove s[left]
             left_char = s[left]
             window_count[left_char] -= 1
+            # Why `<` and not `<=` or `==`?
+            # After decrementing, if the count drops BELOW what t needs,
+            # we just lost a required character. The `<` catches the exact
+            # moment we go from "enough" to "not enough" for this character.
             if left_char in t_count and window_count[left_char] < t_count[left_char]:
                 formed -= 1
             left += 1

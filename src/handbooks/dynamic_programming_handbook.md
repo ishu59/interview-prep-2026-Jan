@@ -81,10 +81,18 @@ DP is an optimization technique for problems with:
 # 6. Answer: dp[n]
 
 def fib(n):
+    # Why <= 1? fib(0) = 0 and fib(1) = 1 are the two base cases.
+    # Any n in {0, 1} can be answered directly without the table.
     if n <= 1:
         return n
+    # Why n + 1 slots? dp is 0-indexed and we need dp[0] through dp[n],
+    # so we need exactly n + 1 entries.
     dp = [0] * (n + 1)
+    # Why dp[1] = 1? This is the second base case: the 1st Fibonacci number is 1.
+    # dp[0] is already 0 from initialization, matching fib(0) = 0.
     dp[1] = 1
+    # Why start at 2? dp[0] and dp[1] are base cases, already filled.
+    # Why go up to n + 1? range is exclusive on the right, so this fills dp[2] through dp[n].
     for i in range(2, n + 1):
         dp[i] = dp[i-1] + dp[i-2]
     return dp[n]
@@ -106,10 +114,11 @@ def linear_dp(nums):
     n = len(nums)
     dp = [0] * n  # or appropriate initial value
 
-    # Base case
+    # Base case: the smallest subproblem (first element) is solved directly.
     dp[0] = base_value(nums[0])
 
-    # Fill table
+    # Why start at 1? dp[0] is the base case, already set above.
+    # Why stop at n (exclusive)? We fill dp[1] through dp[n-1], covering every index.
     for i in range(1, n):
         # Transition: dp[i] depends on previous states
         dp[i] = transition(dp, nums, i)
@@ -136,18 +145,26 @@ def grid_dp(grid):
     m, n = len(grid), len(grid[0])
     dp = [[0] * n for _ in range(m)]
 
-    # Base cases: first row and first column
+    # Base cases: first row and first column.
+    # dp[0][0] is the starting cell -- it has no predecessors.
     dp[0][0] = grid[0][0]
+    # Why start at 1? dp[0][0] is already set. First column cells can only
+    # be reached from directly above, so they have a single-path dependency.
     for i in range(1, m):
         dp[i][0] = transition_row(dp, grid, i, 0)
+    # Same logic: first row cells can only be reached from the left.
     for j in range(1, n):
         dp[0][j] = transition_col(dp, grid, 0, j)
 
-    # Fill table
+    # Why both start at 1? Row 0 and column 0 are already filled above.
+    # Interior cells (i>=1, j>=1) can come from above OR left, so both
+    # dp[i-1][j] and dp[i][j-1] are guaranteed to exist.
     for i in range(1, m):
         for j in range(1, n):
             dp[i][j] = transition(dp, grid, i, j)
 
+    # Why m-1, n-1? The grid is 0-indexed, so the bottom-right destination
+    # is at row m-1, column n-1.
     return dp[m-1][n-1]
 ```
 
@@ -162,14 +179,25 @@ def knapsack(weights, values, capacity):
     dp[i][w] = max value using first i items with capacity w.
     """
     n = len(weights)
+    # Why (n + 1) rows and (capacity + 1) columns?
+    # Row 0 = "using zero items" (base case: all zeros).
+    # Column 0 = "capacity zero" (base case: can't fit anything).
+    # We need rows 0..n and columns 0..capacity, hence the +1.
     dp = [[0] * (capacity + 1) for _ in range(n + 1)]
 
+    # Why start i at 1? Row 0 (zero items) is the base case, already all zeros.
+    # Why go up to n + 1? So i goes from 1 to n, covering every item.
     for i in range(1, n + 1):
         for w in range(capacity + 1):
-            # Don't take item i
+            # Don't take item i: inherit the best value without this item
             dp[i][w] = dp[i-1][w]
 
-            # Take item i (if it fits)
+            # Why i-1 for the weights/values index?
+            # dp uses 1-indexed items (dp[1] = first item), but the
+            # weights/values arrays are 0-indexed. So item i corresponds
+            # to weights[i-1] and values[i-1].
+            # Why weights[i-1] <= w? We can only include this item if
+            # its weight fits within the current capacity w.
             if weights[i-1] <= w:
                 dp[i][w] = max(dp[i][w],
                               dp[i-1][w - weights[i-1]] + values[i-1])
@@ -183,7 +211,14 @@ def knapsack_optimized(weights, values, capacity):
     dp = [0] * (capacity + 1)
 
     for i in range(len(weights)):
-        # Traverse backwards to avoid using updated values
+        # Why traverse backwards (from capacity down to weights[i])?
+        # In 0/1 knapsack each item can be used at most once. If we went
+        # forward, dp[w - weights[i]] might already reflect using item i
+        # (updated earlier in this same loop), effectively using it twice.
+        # Going backwards ensures dp[w - weights[i]] still holds the value
+        # from the previous row (without item i).
+        # Why stop at weights[i] - 1 (exclusive, so last w = weights[i])?
+        # For w < weights[i], item i cannot fit, so dp[w] stays unchanged.
         for w in range(capacity, weights[i] - 1, -1):
             dp[w] = max(dp[w], dp[w - weights[i]] + values[i])
 
@@ -202,8 +237,15 @@ def unbounded_knapsack(weights, values, capacity):
     """
     dp = [0] * (capacity + 1)
 
+    # Why iterate w from 1 to capacity + 1? dp[0] = 0 is the base case
+    # (zero capacity = zero value). We build up from smaller capacities.
     for w in range(1, capacity + 1):
         for i in range(len(weights)):
+            # Why weights[i] <= w? Item i can only be considered if it
+            # fits within the current capacity w.
+            # Why is forward iteration OK here (unlike 0/1 knapsack)?
+            # In unbounded knapsack, items can be reused, so it is correct
+            # for dp[w - weights[i]] to already include item i.
             if weights[i] <= w:
                 dp[w] = max(dp[w], dp[w - weights[i]] + values[i])
 
@@ -221,13 +263,26 @@ def lcs(text1, text2):
     dp[i][j] = LCS of text1[:i] and text2[:j].
     """
     m, n = len(text1), len(text2)
+    # Why (m+1) x (n+1)? Row 0 = "empty prefix of text1", column 0 = "empty
+    # prefix of text2". These are base cases (LCS with an empty string = 0).
     dp = [[0] * (n + 1) for _ in range(m + 1)]
 
+    # Why start both at 1? Row 0 and column 0 are base cases (all zeros).
     for i in range(1, m + 1):
         for j in range(1, n + 1):
+            # Why text1[i-1] and text2[j-1] instead of text1[i] and text2[j]?
+            # dp is 1-indexed (dp[0] = empty string base case), but the
+            # strings are 0-indexed. So dp[i][j] considers text1[0..i-1]
+            # and text2[0..j-1], meaning the "current" characters are
+            # text1[i-1] and text2[j-1].
             if text1[i-1] == text2[j-1]:
+                # Characters match: extend the LCS found for both prefixes
+                # shortened by one (dp[i-1][j-1]), and add 1 for this match.
                 dp[i][j] = dp[i-1][j-1] + 1
             else:
+                # No match: the best LCS is either skipping the last char
+                # of text1 (dp[i-1][j]) or skipping the last char of text2
+                # (dp[i][j-1]). We take the better option.
                 dp[i][j] = max(dp[i-1][j], dp[i][j-1])
 
     return dp[m][n]
@@ -246,18 +301,31 @@ def interval_dp(arr):
     n = len(arr)
     dp = [[0] * n for _ in range(n)]
 
-    # Base case: single elements
+    # Base case: single elements (intervals of length 1).
+    # A single element cannot be split, so its answer is known directly.
     for i in range(n):
         dp[i][i] = base_value(arr[i])
 
-    # Fill by increasing interval length
+    # Why iterate by increasing length (2, 3, ..., n)?
+    # To solve dp[i][j] we need dp[i][k] and dp[k+1][j], which are
+    # shorter intervals. Processing shorter intervals first guarantees
+    # all dependencies are already computed.
     for length in range(2, n + 1):
+        # Why n - length + 1? This ensures i + length - 1 < n,
+        # so the interval [i, j] stays within bounds.
         for i in range(n - length + 1):
             j = i + length - 1
             dp[i][j] = float('inf')  # or -inf for max
 
-            # Try all split points
+            # Why try every k from i to j-1?
+            # k is the split point: we divide [i..j] into [i..k] and [k+1..j].
+            # Every possible split must be tried to find the optimal one.
+            # k stops at j-1 (range(i, j) is exclusive of j) so both halves
+            # are non-empty.
             for k in range(i, j):
+                # Why add cost(i, j, k)?
+                # dp[i][k] + dp[k+1][j] is the cost of solving each half.
+                # cost(i, j, k) is the cost of merging/combining the two halves.
                 dp[i][j] = min(dp[i][j],
                               dp[i][k] + dp[k+1][j] + cost(i, j, k))
 
@@ -280,17 +348,29 @@ def state_machine_dp(prices):
     sold = [0] * n
     rest = [0] * n
 
-    # Base cases
+    # Base cases for day 0:
+    # Why -prices[0]? If we buy on day 0, we spend prices[0], so our profit is negative.
     hold[0] = -prices[0]
+    # Why 0? On day 0 we cannot have sold yet, and resting with no prior action = 0 profit.
     sold[0] = 0
     rest[0] = 0
 
+    # Why start at 1? Day 0 is the base case, already set above.
     for i in range(1, n):
-        # Transitions based on previous states
+        # hold[i]: either keep holding from yesterday (hold[i-1]),
+        # or buy today after resting yesterday (rest[i-1] - prices[i]).
+        # Why rest[i-1] and not sold[i-1]? Because of the cooldown rule:
+        # you must rest one day after selling before buying again.
         hold[i] = max(hold[i-1], rest[i-1] - prices[i])
+        # sold[i]: we must have been holding yesterday and sell today.
+        # Why + prices[i]? Selling means gaining the current price.
         sold[i] = hold[i-1] + prices[i]
+        # rest[i]: either keep resting (rest[i-1]) or transition from
+        # having sold yesterday (sold[i-1]).
         rest[i] = max(rest[i-1], sold[i-1])
 
+    # Why max of sold and rest? On the last day we either just sold or
+    # are resting. Holding stock at the end is never optimal (unsold stock = wasted).
     return max(sold[n-1], rest[n-1])
 ```
 
@@ -366,12 +446,19 @@ def state_machine_dp(prices):
 def maxSubArray(nums: list[int]) -> int:
     # dp[i] = max subarray sum ENDING at index i
     dp = [0] * len(nums)
+    # Why nums[0]? The subarray ending at index 0 is just the single element.
     dp[0] = nums[0]
 
+    # Why start at 1? dp[0] is the base case.
     for i in range(1, len(nums)):
-        # Either extend previous subarray or start new
+        # Why max(dp[i-1] + nums[i], nums[i])?
+        # Two choices: extend the best subarray ending at i-1 by adding nums[i],
+        # or start a fresh subarray at i. We start fresh when the previous
+        # subarray sum is negative (it would only drag down the total).
         dp[i] = max(dp[i-1] + nums[i], nums[i])
 
+    # Why max(dp) and not dp[-1]? The best subarray can end at ANY index,
+    # not necessarily the last one.
     return max(dp)
 ```
 

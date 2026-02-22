@@ -138,6 +138,11 @@ def backtrack(result, current, choices, start):
         current.append(choices[i])
 
         # Recurse
+        # Why `i + 1` vs `i`?
+        # `i + 1` = "move forward, no reuse" (subsets, combos with unique elements).
+        # `i` = "stay here, allow reuse" (Combination Sum where same element can repeat).
+        # Think of it like a buffet line: i+1 means you pass a dish and can't go back;
+        # i means you can scoop from the same dish again.
         backtrack(result, current, choices, i + 1)  # or i for reuse
 
         # Undo choice (backtrack)
@@ -157,7 +162,10 @@ def subsets(nums):
     result = []
 
     def backtrack(index, current):
-        # Every state is a valid subset
+        # Why `index == len(nums)` as the base case?
+        # We make one binary decision (include/exclude) per element.
+        # When index reaches the end, we've decided on every element --
+        # whatever is in `current` is a complete subset.
         if index == len(nums):
             result.append(current.copy())
             return
@@ -205,12 +213,19 @@ def permutations(nums):
     used = [False] * len(nums)
 
     def backtrack(current):
-        # Complete when all elements used
+        # Why `len(current) == len(nums)`?
+        # A permutation must use every element exactly once.
+        # When current's length matches nums, all elements are placed.
         if len(current) == len(nums):
             result.append(current.copy())
             return
 
         for i in range(len(nums)):
+            # Why `used[i]`?
+            # Permutations need each element exactly once. The `used` array
+            # tracks which elements are already in `current` so we don't
+            # pick the same index twice. (Unlike subsets where `start`
+            # prevents revisiting, permutations consider ALL indices each time.)
             if used[i]:
                 continue
 
@@ -268,6 +283,11 @@ def combinations(n, k):
         # Pruning: not enough elements left
         remaining = n - start + 1
         needed = k - len(current)
+        # Why `remaining < needed`?
+        # If there are fewer elements left than slots to fill, there's no way
+        # to complete the combination. Example: n=5, k=3, current=[1], start=5.
+        # remaining = 5-5+1 = 1, needed = 3-1 = 2. Only one number left (5),
+        # but we need two more -- impossible, so prune the entire branch.
         if remaining < needed:
             return
 
@@ -333,10 +353,18 @@ def partition(s):
         return True  # Implement specific validation
 
     def backtrack(start, current):
+        # Why `start == len(s)`?
+        # `start` is our read cursor in the string. When it reaches the end,
+        # we've partitioned the entire string -- every character is covered.
         if start == len(s):
             result.append(current.copy())
             return
 
+        # Why `range(start + 1, len(s) + 1)`?
+        # `start + 1` because the smallest slice has length 1 (s[start:start+1]).
+        # `len(s) + 1` because Python slicing is exclusive -- s[start:len(s)]
+        # grabs through the last character. This tries every possible "next chunk"
+        # from length 1 up to the rest of the string.
         for end in range(start + 1, len(s) + 1):
             part = s[start:end]
             if is_valid_part(part):
@@ -452,7 +480,19 @@ def subsetsWithDup(nums: list[int]) -> list[list[int]]:
         result.append(current.copy())
 
         for i in range(start, len(nums)):
-            # Skip duplicates at same level
+            # Why `i > start` (not `i > 0`)?
+            # `start` marks where this recursion level begins choosing.
+            # When i == start, it's the FIRST choice at this level -- always allowed.
+            # When i > start, we're making a LATER choice at the same level.
+            # If nums[i] == nums[i-1] in that case, we'd generate a duplicate branch.
+            #
+            # Concrete example with [1, 2, 2]:
+            #   At level where start=1, i=1 picks first 2 -> [1,2] (allowed, i == start)
+            #   At level where start=1, i=2 picks second 2 -> [1,2] again (SKIP, i > start)
+            # If we used `i > 0` instead, we'd wrongly skip [1,2,2] because when
+            # building [1,2,...], the recursive call has start=2, i=2: i > 0 is true
+            # and nums[2]==nums[1], so we'd skip -- but that's a DEEPER level choice,
+            # not a same-level duplicate. `i > start` only skips same-level repeats.
             if i > start and nums[i] == nums[i - 1]:
                 continue
 
@@ -549,7 +589,22 @@ def permuteUnique(nums: list[int]) -> list[list[int]]:
             if used[i]:
                 continue
 
-            # Skip duplicates: if same as previous AND previous not used
+            # Why `i > 0 and nums[i] == nums[i-1] and not used[i-1]`?
+            # This is the trickiest duplicate-skip condition. Let's trace [1a, 1b, 2]:
+            #
+            # Without this check, we'd get both [1a,1b,2] AND [1b,1a,2] -- duplicates.
+            # The rule: among identical values, always use them in left-to-right order.
+            #
+            # `not used[i-1]` means: "the previous duplicate is NOT in the current path."
+            # If nums[i-1] is not used but nums[i] is the same value, it means we're
+            # trying to pick the SECOND copy before the FIRST -- that's out of order.
+            #
+            # Trace with [1a, 1b, 2]:
+            #   Pick 1a (used=[T,F,F]) -> pick 1b (used=[T,T,F]) -> pick 2. OK: [1a,1b,2]
+            #   Pick 1b? (used=[F,F,F]) -> i=1, nums[1]==nums[0], used[0]=False -> SKIP.
+            #     We'd be using 1b before 1a, which would create a duplicate permutation.
+            #   Pick 2 (used=[F,F,T]) -> pick 1a (used=[T,F,T]) -> pick 1b. OK: [2,1a,1b]
+            #     When picking 1b here, used[0]=True (1a already in path), so NOT skipped.
             if i > 0 and nums[i] == nums[i - 1] and not used[i - 1]:
                 continue
 
@@ -615,12 +670,19 @@ def combinationSum(candidates: list[int], target: int) -> list[list[int]]:
         if remaining == 0:
             result.append(current.copy())
             return
+        # Why `remaining < 0`?
+        # We've overshot the target -- the current combination sums to more
+        # than target. No point continuing; adding more positives only makes
+        # it worse. This is our "went too far" guardrail.
         if remaining < 0:
             return
 
         for i in range(start, len(candidates)):
             current.append(candidates[i])
-            # Pass i (not i+1) to allow reuse
+            # Why `backtrack(i, ...)` instead of `backtrack(i + 1, ...)`?
+            # `i` (not i+1) means "you can pick this same candidate again."
+            # This is what allows unlimited reuse. If we passed i+1, we'd
+            # move past this candidate and never pick it again.
             backtrack(i, current, remaining - candidates[i])
             current.pop()
 
@@ -647,11 +709,18 @@ def combinationSum2(candidates: list[int], target: int) -> list[list[int]]:
             return
 
         for i in range(start, len(candidates)):
-            # Skip duplicates at same level
+            # Why `i > start and candidates[i] == candidates[i-1]`?
+            # Same logic as Subsets II: at a given recursion level, don't
+            # pick the same value twice. The first occurrence already
+            # explores all combinations that include this value.
             if i > start and candidates[i] == candidates[i - 1]:
                 continue
 
-            # Pruning: remaining too small
+            # Why `break` instead of `continue`?
+            # The array is SORTED. If candidates[i] already exceeds remaining,
+            # then candidates[i+1], candidates[i+2], ... are all >= candidates[i],
+            # so they'll also exceed remaining. No point checking further --
+            # `break` skips them all. `continue` would wastefully check each one.
             if candidates[i] > remaining:
                 break
 
@@ -680,6 +749,11 @@ def combinationSum3(k: int, n: int) -> list[list[int]]:
             return
 
         for i in range(start, 10):
+            # Why `i > remaining` with `break`?
+            # Numbers 1-9 are naturally sorted. If the current number `i`
+            # already exceeds what's left to reach the target, every number
+            # after it (i+1, i+2, ...) is even larger. Example: remaining=5,
+            # i=6 -- we can't use 6 (too big), and 7,8,9 are worse. Break out.
             if i > remaining:  # Pruning
                 break
 
@@ -742,13 +816,19 @@ def generateParenthesis(n: int) -> list[str]:
             result.append(''.join(current))
             return
 
-        # Can always add open if we haven't used all
+        # Why `open_count < n`?
+        # We have exactly n open parens to place. If we've already placed
+        # all n, we can't add more. This is the "supply limit" for '('.
         if open_count < n:
             current.append('(')
             backtrack(current, open_count + 1, close_count)
             current.pop()
 
-        # Can add close only if we have open to match
+        # Why `close_count < open_count`?
+        # A ')' must close a previously opened '('. If close_count == open_count,
+        # every '(' so far has a matching ')' -- adding another ')' would be
+        # unmatched (e.g., "())" is invalid). This single rule guarantees we
+        # never produce an invalid sequence: every ')' has a '(' to its left.
         if close_count < open_count:
             current.append(')')
             backtrack(current, open_count, close_count + 1)
@@ -778,6 +858,11 @@ def partition(s: str) -> list[list[str]]:
 
         for end in range(start + 1, len(s) + 1):
             substring = s[start:end]
+            # Why check `is_palindrome(substring)` before recursing?
+            # This is our pruning condition. We only want partitions where
+            # EVERY piece is a palindrome. If this piece isn't, there's no
+            # point exploring further splits after it -- the partition is
+            # already invalid. This skips huge subtrees.
             if is_palindrome(substring):
                 current.append(substring)
                 backtrack(end, current)
@@ -800,12 +885,20 @@ def restoreIpAddresses(s: str) -> list[str]:
     def is_valid(segment):
         if not segment or len(segment) > 3:
             return False
+        # Why `len(segment) > 1 and segment[0] == '0'`?
+        # IP addresses don't allow leading zeros: "01" or "001" are invalid,
+        # but "0" alone is fine. "01.01.01.01" is not a real IP address.
+        # The `len > 1` check lets the single "0" through.
         if len(segment) > 1 and segment[0] == '0':
             return False
         return 0 <= int(segment) <= 255
 
     def backtrack(start, parts):
-        # Have 4 parts and used all characters
+        # Why `len(parts) == 4` AND `start == len(s)`? Both needed!
+        # An IP has exactly 4 octets, so we need exactly 4 parts.
+        # But we also need every character used -- "1.2.3.4" from "12345"
+        # would leave '5' unused. Only when BOTH conditions hold do we
+        # have a valid, complete IP address.
         if len(parts) == 4:
             if start == len(s):
                 result.append('.'.join(parts))
@@ -852,6 +945,17 @@ def solveNQueens(n: int) -> list[list[str]]:
             return
 
         for col in range(n):
+            # Why `row - col` for one diagonal, `row + col` for the other?
+            # Picture the board. On a top-left-to-bottom-right diagonal (\),
+            # as you move down-right, row increases and col increases by the
+            # same amount, so `row - col` stays constant. Example:
+            #   (0,0), (1,1), (2,2) all have row-col = 0
+            #   (0,1), (1,2), (2,3) all have row-col = -1
+            # On a top-right-to-bottom-left diagonal (/), row increases
+            # while col decreases, so `row + col` stays constant. Example:
+            #   (0,2), (1,1), (2,0) all have row+col = 2
+            # If any queen shares the same row-col or row+col, they're on
+            # the same diagonal and would attack each other.
             if col in cols or (row - col) in diag1 or (row + col) in diag2:
                 continue
 
@@ -928,6 +1032,11 @@ def solveSudoku(board: list[list[str]]) -> None:
             return False
 
         # Check 3x3 box
+        # Why `3 * (row // 3)` and `3 * (col // 3)`?
+        # Integer division `row // 3` tells us WHICH box (0, 1, or 2).
+        # Multiplying by 3 gives the top-left corner of that box.
+        # Example: row=5 -> 5//3 = 1 -> 3*1 = 3 (box starts at row 3).
+        # row=7 -> 7//3 = 2 -> 3*2 = 6. This "snaps" any row to its box origin.
         box_row, box_col = 3 * (row // 3), 3 * (col // 3)
         for i in range(box_row, box_row + 3):
             for j in range(box_col, box_col + 3):
@@ -936,6 +1045,11 @@ def solveSudoku(board: list[list[str]]) -> None:
 
         return True
 
+    # Why does `backtrack()` return True/False?
+    # Unlike subsets/permutations where we collect ALL solutions, Sudoku
+    # has exactly one solution. We need to STOP as soon as we find it.
+    # Returning True propagates up the call stack: "solution found, stop searching."
+    # Returning False means "this path is a dead end, try something else."
     def backtrack():
         # Find empty cell
         for i in range(9):
@@ -947,6 +1061,12 @@ def solveSudoku(board: list[list[str]]) -> None:
                             if backtrack():
                                 return True
                             board[i][j] = '.'
+                    # Why `return False` here?
+                    # We tried all 9 digits for this cell and NONE worked.
+                    # This cell is unsolvable with the current board state,
+                    # so the mistake was made earlier. We must backtrack --
+                    # telling the caller "undo your last placement and try
+                    # a different number."
                     return False  # No valid number for this cell
 
         return True  # All cells filled
@@ -1020,14 +1140,30 @@ def exist(board: list[list[str]], word: str) -> bool:
 
         if r < 0 or r >= rows or c < 0 or c >= cols:
             return False
+        # Why check `board[r][c] != word[index]`?
+        # Character mismatch = prune. If this cell doesn't match the letter
+        # we need, there's no point exploring any of the 4 directions from
+        # here. This single check eliminates huge branches early.
         if board[r][c] != word[index]:
             return False
 
         # Mark as visited
+        # Why mutate the board with '#' instead of using a visited set?
+        # 1. Space: A set of (r,c) tuples costs O(n) extra memory; in-place
+        #    marking costs O(1) extra.
+        # 2. Shared state: The board IS the shared state -- marking it directly
+        #    means recursive calls automatically see what's visited without
+        #    passing an extra structure around.
+        # 3. We restore it immediately after, so the board stays unchanged
+        #    for other starting points.
         temp = board[r][c]
         board[r][c] = '#'
 
         # Explore neighbors
+        # Why use `or` chain instead of exploring all four?
+        # Short-circuit evaluation: as soon as ANY direction finds the word,
+        # `or` returns True immediately without trying the remaining directions.
+        # We only need one valid path, not all of them.
         found = (backtrack(r + 1, c, index + 1) or
                  backtrack(r - 1, c, index + 1) or
                  backtrack(r, c + 1, index + 1) or
@@ -1080,6 +1216,11 @@ def findWords(board: list[list[str]], words: list[str]) -> list[str]:
 
         if next_node.word:
             result.append(next_node.word)
+            # Why set `next_node.word = None` after finding?
+            # The same word can be found starting from multiple board cells.
+            # Without this, we'd add "OATH" to results every time we find it.
+            # Setting to None acts like "cross it off the list" -- once found,
+            # don't report it again.
             next_node.word = None  # Avoid duplicates
 
         # Mark visited
@@ -1099,6 +1240,13 @@ def findWords(board: list[list[str]], words: list[str]) -> list[str]:
 
     return result
 ```
+
+**Why use a Trie instead of calling Word Search (6A) for each word?**
+If you have `k` words and an `m x n` board, calling the single-word search for each word
+costs `O(k * m * n * 4^L)` where `L` is word length. With a Trie, you do ONE traversal
+of the board and simultaneously check all `k` words by walking the Trie in lockstep.
+All words sharing a prefix (e.g., "oath" and "oat") share traversal work. The Trie
+turns `k` separate searches into one search with shared prefix elimination.
 
 ---
 
@@ -1420,5 +1568,55 @@ if i > start and nums[i] == nums[i-1]:
 3. Sum variants: 39 → 40 → 216
 4. Strings: 17 → 22 → 131 → 93
 5. Constraints: 51 → 37 → 79
+
+---
+
+## Appendix: Conditional Quick Reference
+
+### 1. Base Cases
+
+| Condition | Where Used | Why |
+|-----------|-----------|-----|
+| `index == len(nums)` | Template B (Subsets) | Decided include/exclude for every element -- subset is complete |
+| `len(current) == len(nums)` | Template C (Permutations) | All elements placed -- permutation is complete |
+| `len(current) == k` | Template D (Combinations) | Chosen exactly k elements -- combination is complete |
+| `remaining == 0` | Combination Sum (3B, 3C) | Current selection sums exactly to target |
+| `start == len(s)` | Template F, Palindrome Partition (4C) | Read cursor reached end of string -- all characters partitioned |
+| `row == n` | N-Queens (5A) | Placed a queen in every row -- valid arrangement found |
+| `len(parts) == 4 and start == len(s)` | IP Addresses (4D) | Exactly 4 octets AND all characters consumed -- valid IP |
+| `index == len(word)` | Word Search (6A) | Matched every character in the word -- word found |
+| `idx == len(empty)` | Sudoku (5C) | All empty cells filled -- puzzle solved |
+
+### 2. Pruning Conditions
+
+| Condition | Where Used | Why |
+|-----------|-----------|-----|
+| `remaining < needed` | Template D (Combinations) | Fewer elements left than slots to fill -- completion impossible |
+| `remaining < 0` | Combination Sum (3B) | Overshot the target -- adding more only makes it worse |
+| `candidates[i] > remaining` | Combination Sum II (3C) | Sorted array: this and all later candidates exceed target, `break` |
+| `i > remaining` | Combination Sum III (3D) | Numbers 1-9 are sorted: current number exceeds remaining sum, `break` |
+| `board[r][c] != word[index]` | Word Search (6A) | Character mismatch -- no point exploring neighbors from here |
+| `is_palindrome(substring)` | Palindrome Partition (4C) | Only recurse on palindromic pieces -- skip invalid partitions |
+| `col in cols or (row-col) in diag1 or (row+col) in diag2` | N-Queens (5A) | Queen would be attacked on column or diagonal -- invalid placement |
+
+### 3. Duplicate Handling
+
+| Condition | Where Used | Why |
+|-----------|-----------|-----|
+| `i > start and nums[i] == nums[i-1]` | Subsets II (1B), Combination Sum II (3C) | Skip same-value choice at same recursion level; `i > start` (not `i > 0`) so deeper-level picks are not wrongly skipped |
+| `i > 0 and nums[i] == nums[i-1] and not used[i-1]` | Permutations II (2B) | Among identical values, enforce left-to-right usage order; `not used[i-1]` means we're trying to use a later copy before an earlier one |
+| `next_node.word = None` | Word Search II (6B) | After finding a word, clear it from the Trie so it isn't added to results again |
+
+### 4. Constraint Checks
+
+| Condition | Where Used | Why |
+|-----------|-----------|-----|
+| `used[i]` | Template C (Permutations) | Element already in current permutation -- can't reuse same index |
+| `open_count < n` | Generate Parentheses (4B) | Supply limit: can't place more open parens than `n` total |
+| `close_count < open_count` | Generate Parentheses (4B) | Balance rule: every `)` must match a prior `(` -- prevents invalid sequences |
+| `len(segment) > 1 and segment[0] == '0'` | IP Addresses (4D) | No leading zeros in IP octets: "01" is invalid, but "0" alone is fine |
+| `3 * (row // 3), 3 * (col // 3)` | Sudoku (5C) | Snaps any cell to its 3x3 box's top-left corner for box constraint check |
+| `backtrack()` returns `True/False` | Sudoku (5C) | Need to stop after first solution; `True` propagates "found it," `False` triggers backtracking |
+| `board[r][c] = '#'` (temp mark) | Word Search (6A, 6B) | In-place visited marking: O(1) space, avoids passing a separate visited set |
 
 Good luck with your interview preparation!

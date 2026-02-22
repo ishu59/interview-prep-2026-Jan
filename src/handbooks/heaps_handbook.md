@@ -133,10 +133,16 @@ def top_k_largest(nums: list[int], k: int) -> list[int]:
     heap = []
 
     for num in nums:
+        # Why `< k` and not `<= k`?
+        # We want exactly k items. When len == k, the heap is full.
+        # Adding one more would make it k+1, so we switch to replace mode.
         if len(heap) < k:
             heapq.heappush(heap, num)
         elif num > heap[0]:  # Larger than smallest in top-k
-            heapq.heapreplace(heap, num)  # Pop and push in one operation
+            # heapreplace = pop + push in ONE sift (faster than separate calls).
+            # Safe here because we already checked num > heap[0],
+            # so the new element belongs in the top-k.
+            heapq.heapreplace(heap, num)
 
     return heap  # Contains k largest (not sorted)
 ```
@@ -152,6 +158,8 @@ def top_k_smallest(nums: list[int], k: int) -> list[int]:
     heap = []  # Max-heap using negation
 
     for num in nums:
+        # Same size-k gatekeeper logic, but inverted with negation.
+        # -heap[0] is the largest value currently in the "k smallest" set.
         if len(heap) < k:
             heapq.heappush(heap, -num)
         elif num < -heap[0]:  # Smaller than largest in top-k
@@ -179,14 +187,20 @@ def merge_k_sorted(lists: list[list[int]]) -> list[int]:
 
     # Initialize with first element from each list
     for i, lst in enumerate(lists):
+        # Skip empty lists to avoid index errors and empty heap entries.
         if lst:
             heapq.heappush(heap, (lst[0], i, 0))
 
+    # Why `while heap`?
+    # The heap shrinks as lists are exhausted. When heap is empty,
+    # every element from every list has been processed.
     while heap:
         val, list_idx, elem_idx = heapq.heappop(heap)
         result.append(val)
 
-        # Push next element from same list
+        # Push next element from same list.
+        # Why `elem_idx + 1 < len(...)`? Bounds check -- only push
+        # if this list still has more elements to contribute.
         if elem_idx + 1 < len(lists[list_idx]):
             next_val = lists[list_idx][elem_idx + 1]
             heapq.heappush(heap, (next_val, list_idx, elem_idx + 1))
@@ -215,17 +229,27 @@ class MedianFinder:
         self.large = []  # Min-heap for upper half
 
     def addNum(self, num: int) -> None:
-        # Always add to small first, then balance
+        # Step 1: Always add to small (lower half) first.
+        # Why always small? This is a convention -- we arbitrarily
+        # let small hold the extra element when count is odd.
         heapq.heappush(self.small, -num)
 
-        # Move largest from small to large
+        # Step 2: Move the largest of small to large.
+        # This GUARANTEES max(small) <= min(large) after every insert,
+        # because we always pass the biggest "small" value to "large".
         heapq.heappush(self.large, -heapq.heappop(self.small))
 
-        # Balance sizes: small can have at most 1 more than large
+        # Step 3: Balance sizes -- small can have at most 1 more than large.
+        # Why `len(large) > len(small)` and not `>=`?
+        # We allow small to be 1 bigger (odd count), but large must
+        # never be bigger than small. If it is, move one back.
         if len(self.large) > len(self.small):
             heapq.heappush(self.small, -heapq.heappop(self.large))
 
     def findMedian(self) -> float:
+        # Why check `len(small) > len(large)`?
+        # If odd count, small has the extra element -- that's the median.
+        # If even count, average the two heap tops.
         if len(self.small) > len(self.large):
             return -self.small[0]
         return (-self.small[0] + self.large[0]) / 2
@@ -286,6 +310,12 @@ class LazyHeap:
 
     def _clean(self):
         """Remove deleted elements from top of heap."""
+        # Why `while` and not `if`? Multiple consecutive deleted elements
+        # may stack up at the top. We must drain ALL of them before the
+        # real top is exposed.
+        # Why `self.heap and ...`? Guard against popping from an empty heap.
+        # Why `> 0`? We track deletion counts (not booleans) to handle
+        # duplicate values -- each deletion cancels one occurrence.
         while self.heap and self.deleted[self.heap[0]] > 0:
             self.deleted[self.heap[0]] -= 1
             heapq.heappop(self.heap)
@@ -311,16 +341,22 @@ def k_way_process(sources: list, process_func):
     for i, source in enumerate(sources):
         iterator = iter(source)
         first = next(iterator, None)
+        # Skip exhausted/empty sources -- they contribute nothing.
         if first is not None:
             heapq.heappush(heap, (first, i, iterator))
 
+    # Heap always holds at most one element per source.
+    # When a source is exhausted, its slot disappears. When all
+    # sources are exhausted, the heap is empty and we stop.
     while heap:
         val, source_idx, iterator = heapq.heappop(heap)
 
         # Process current element
         process_func(val, source_idx)
 
-        # Get next from same source
+        # Get next from same source.
+        # `next(iterator, None)` returns None when exhausted --
+        # we only re-push if the source has more data.
         next_val = next(iterator, None)
         if next_val is not None:
             heapq.heappush(heap, (next_val, source_idx, iterator))
@@ -401,9 +437,15 @@ def findKthLargest(nums: list[int], k: int) -> int:
 
     for num in nums:
         heapq.heappush(heap, num)
+        # Why `> k` and not `>= k`?
+        # After pushing, the heap has one too many elements.
+        # We pop when size is k+1, keeping exactly k elements.
+        # Using `>= k` would keep only k-1 elements (off by one!).
         if len(heap) > k:
             heapq.heappop(heap)
 
+    # After processing all nums, the heap holds the k largest.
+    # The root (heap[0]) is the smallest of those k -- the kth largest.
     return heap[0]
 ```
 
@@ -456,10 +498,14 @@ from collections import Counter
 def topKFrequent(nums: list[int], k: int) -> list[int]:
     count = Counter(nums)
 
-    # Min-heap by frequency, size k
+    # Min-heap by frequency, size k.
+    # The heap tuple is (freq, num): freq is compared first,
+    # so the LEAST frequent element sits at the root as gatekeeper.
     heap = []
     for num, freq in count.items():
         heapq.heappush(heap, (freq, num))
+        # Evict the least frequent whenever heap exceeds k.
+        # This guarantees only the k most frequent survive.
         if len(heap) > k:
             heapq.heappop(heap)
 
@@ -484,8 +530,11 @@ def topKFrequent_bucket(nums: list[int], k: int) -> list[int]:
         buckets[freq].append(num)
 
     result = []
+    # Walk from highest frequency down to 0.
     for freq in range(len(buckets) - 1, -1, -1):
         result.extend(buckets[freq])
+        # Why `>= k` and not `== k`? Multiple numbers can share the
+        # same frequency, so we may overshoot. Slice to exactly k.
         if len(result) >= k:
             return result[:k]
 
@@ -509,10 +558,15 @@ def kClosest(points: list[list[int]], k: int) -> list[list[int]]:
     heap = []
 
     for x, y in points:
-        dist = x*x + y*y  # No need for sqrt
+        dist = x*x + y*y  # No need for sqrt (preserves ordering)
         if len(heap) < k:
+            # Negate distance: Python's min-heap becomes a max-heap.
+            # The FARTHEST of the k closest sits at the root as gatekeeper.
             heapq.heappush(heap, (-dist, [x, y]))
         elif dist < -heap[0][0]:
+            # Why `dist < -heap[0][0]`?
+            # -heap[0][0] is the farthest distance in our k-closest set.
+            # If this point is closer, it replaces the farthest.
             heapq.heapreplace(heap, (-dist, [x, y]))
 
     return [point for dist, point in heap]
@@ -537,13 +591,15 @@ from collections import Counter
 def frequencySort(s: str) -> str:
     count = Counter(s)
 
-    # Max-heap by frequency
+    # Max-heap by frequency (negate so most frequent pops first).
     heap = [(-freq, char) for char, freq in count.items()]
-    heapq.heapify(heap)
+    heapq.heapify(heap)  # O(n) -- faster than n individual pushes
 
     result = []
+    # Pop characters in frequency order (highest first).
     while heap:
         freq, char = heapq.heappop(heap)
+        # -freq converts back to the positive count for repetition.
         result.append(char * (-freq))
 
     return ''.join(result)
@@ -574,7 +630,10 @@ class ListNode:
 def mergeKLists(lists: list[ListNode]) -> ListNode:
     heap = []
 
-    # Initialize with heads
+    # Initialize with heads. Skip None lists (empty linked lists).
+    # We include index `i` as a tiebreaker: when two nodes have the
+    # same val, Python compares the next tuple element. Without `i`,
+    # it would try to compare ListNode objects, which crashes.
     for i, node in enumerate(lists):
         if node:
             heapq.heappush(heap, (node.val, i, node))
@@ -587,6 +646,7 @@ def mergeKLists(lists: list[ListNode]) -> ListNode:
         current.next = node
         current = current.next
 
+        # Only push the next node if this list isn't exhausted.
         if node.next:
             heapq.heappush(heap, (node.next.val, idx, node.next))
 

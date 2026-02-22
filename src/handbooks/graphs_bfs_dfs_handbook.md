@@ -146,11 +146,19 @@ def bfs(graph: dict, start: int) -> list:
     queue = deque([start])
     result = []
 
+    # Why does `while queue` terminate?
+    # Each node enters the queue at most once (we check `visited` before adding).
+    # So after at most V iterations, the queue is empty.
     while queue:
         node = queue.popleft()
         result.append(node)
 
         for neighbor in graph[node]:
+            # Why check `visited` BEFORE adding to queue (not after popping)?
+            # This is called "early marking." If we waited until popping,
+            # the same node could be added to the queue by MULTIPLE neighbors,
+            # wasting memory and time. Early marking ensures each node is
+            # queued exactly once.
             if neighbor not in visited:
                 visited.add(neighbor)
                 queue.append(neighbor)
@@ -170,6 +178,11 @@ def bfs_levels(graph: dict, start: int) -> list[list]:
     levels = []
 
     while queue:
+        # Why snapshot len(queue) here?
+        # The queue currently holds ALL nodes at the current level.
+        # As we process them, we'll add next-level nodes to the queue.
+        # Without the snapshot, we'd mix levels together.
+        # The snapshot tells us "process exactly this many, then stop."
         level_size = len(queue)
         level = []
 
@@ -282,6 +295,12 @@ def dfs_iterative(graph: dict, start: int) -> list:
 
     while stack:
         node = stack.pop()
+        # Why check AFTER popping (not before adding like BFS)?
+        # With a stack, the same node can be pushed multiple times by
+        # different neighbors. Checking at pop time is simpler and correct:
+        # "Did someone already process me? If so, skip."
+        # BFS can use early marking because FIFO order guarantees the first
+        # enqueue finds the shortest path. DFS has no such guarantee.
         if node in visited:
             continue
 
@@ -315,10 +334,15 @@ def all_paths(graph: dict, start: int, end: int) -> list[list]:
             return
 
         for neighbor in graph[node]:
-            if neighbor not in path:  # Avoid cycles
+            # Why `not in path` instead of `not in visited`?
+            # A visited set would permanently exclude nodes. But for
+            # ALL-PATHS problems, we need to revisit nodes on DIFFERENT
+            # paths. Using the current `path` means: "don't revisit on
+            # THIS path (avoid cycles), but allow it on other paths."
+            if neighbor not in path:
                 path.append(neighbor)
                 dfs(neighbor)
-                path.pop()  # Backtrack
+                path.pop()  # Backtrack: undo choice, try next neighbor
 
     dfs(start)
     return result
@@ -353,6 +377,11 @@ def grid_bfs(grid: list[list[int]], sources: list[tuple]) -> list[list[int]]:
         for dr, dc in directions:
             nr, nc = r + dr, c + dc
             if 0 <= nr < rows and 0 <= nc < cols:
+                # Why `> distances[r][c] + 1` instead of a visited set?
+                # Multi-source BFS may reach the same cell from different sources.
+                # We only want to process it if we found a SHORTER path.
+                # This also serves as the "visited" check — if distance is
+                # already optimal, the condition is false and we skip it.
                 if distances[nr][nc] > distances[r][c] + 1:
                     distances[nr][nc] = distances[r][c] + 1
                     queue.append((nr, nc))
@@ -381,20 +410,28 @@ def topological_sort(num_nodes: int, edges: list[list[int]]) -> list:
         graph[a].append(b)
         in_degree[b] += 1
 
-    # Start with nodes having no prerequisites
+    # Start with nodes having no prerequisites (in-degree 0).
+    # These are "ready" — nothing blocks them.
+    # Analogy: courses with no prerequisites can be taken immediately.
     queue = deque([i for i in range(num_nodes) if in_degree[i] == 0])
     result = []
 
     while queue:
         node = queue.popleft()
-        result.append(node)
+        result.append(node)  # "Take" this course
 
         for neighbor in graph[node]:
+            # "Completing" this node satisfies one prerequisite for neighbor.
             in_degree[neighbor] -= 1
+            # When ALL prerequisites are satisfied (in-degree reaches 0),
+            # the neighbor becomes "ready" and can enter the queue.
             if in_degree[neighbor] == 0:
                 queue.append(neighbor)
 
-    # Check if all nodes processed (no cycle)
+    # Why does len(result) != num_nodes mean a cycle?
+    # If there's a cycle, nodes in it can NEVER reach in-degree 0
+    # (they're all waiting on each other). So they never enter the queue
+    # and never appear in the result. Missing nodes = cycle exists.
     return result if len(result) == num_nodes else []
 ```
 
@@ -412,6 +449,11 @@ def topological_sort_dfs(num_nodes: int, edges: list[list[int]]) -> list:
     for a, b in edges:
         graph[a].append(b)
 
+    # The 3-color system:
+    # WHITE = unvisited (haven't seen this node yet)
+    # GRAY  = in progress (currently in the DFS call stack — we started
+    #         exploring it but haven't finished all its descendants)
+    # BLACK = fully processed (all descendants explored)
     WHITE, GRAY, BLACK = 0, 1, 2
     color = [WHITE] * num_nodes
     result = []
@@ -422,17 +464,21 @@ def topological_sort_dfs(num_nodes: int, edges: list[list[int]]) -> list:
         if has_cycle:
             return
 
-        color[node] = GRAY  # Currently being processed
+        color[node] = GRAY  # "I'm exploring this node's subtree now"
 
         for neighbor in graph[node]:
-            if color[neighbor] == GRAY:  # Back edge = cycle
+            if color[neighbor] == GRAY:
+                # GRAY neighbor = back edge = CYCLE!
+                # This neighbor is an ANCESTOR in our current DFS path.
+                # We left it to explore deeper, and now we've circled back.
+                # Like finding footprints ahead of you on a one-way trail.
                 has_cycle = True
                 return
-            if color[neighbor] == WHITE:
+            if color[neighbor] == WHITE:  # Unvisited: explore it
                 dfs(neighbor)
 
-        color[node] = BLACK  # Finished
-        result.append(node)
+        color[node] = BLACK  # "Done with this node and all its descendants"
+        result.append(node)  # Post-order: add after all descendants processed
 
     for i in range(num_nodes):
         if color[i] == WHITE:
@@ -462,6 +508,10 @@ def dijkstra(graph: dict, start: int, end: int) -> int:
     while heap:
         dist, node = heapq.heappop(heap)
 
+        # Why skip if already visited?
+        # The heap may contain STALE entries for this node (older, longer paths).
+        # Since we process shortest-first, the FIRST time we pop a node is
+        # guaranteed to be its shortest distance. All later pops are outdated.
         if node in visited:
             continue
         visited.add(node)
@@ -472,6 +522,10 @@ def dijkstra(graph: dict, start: int, end: int) -> int:
         for neighbor, weight in graph[node]:
             if neighbor not in visited:
                 new_dist = dist + weight
+                # Relaxation: "Is this new path shorter than the best known?"
+                # If yes, update and push to heap. We don't remove the old
+                # heap entry (expensive), instead we rely on the visited check
+                # above to skip it when it's eventually popped.
                 if new_dist < distances[neighbor]:
                     distances[neighbor] = new_dist
                     heapq.heappush(heap, (new_dist, neighbor))
@@ -552,12 +606,17 @@ def numIslands(grid: list[list[str]]) -> int:
     count = 0
 
     def dfs(r, c):
+        # Boundary check: gone off the grid edges.
         if r < 0 or r >= rows or c < 0 or c >= cols:
             return
+        # Not land (either water '0' or already-visited-land marked as '0').
         if grid[r][c] != '1':
             return
 
-        grid[r][c] = '0'  # Mark visited
+        # Mark visited IN-PLACE by changing '1' to '0'.
+        # Why not use a separate visited set? Saves O(m*n) space.
+        # Tradeoff: mutates the input. If that's not allowed, use visited set.
+        grid[r][c] = '0'
 
         dfs(r + 1, c)
         dfs(r - 1, c)
@@ -567,6 +626,9 @@ def numIslands(grid: list[list[str]]) -> int:
     for r in range(rows):
         for c in range(cols):
             if grid[r][c] == '1':
+                # Found an unvisited land cell = new island!
+                # Each DFS call "sinks" the entire connected island,
+                # so next time we find a '1', it must be a DIFFERENT island.
                 count += 1
                 dfs(r, c)
 
@@ -686,6 +748,8 @@ from collections import deque
 
 def shortestPathBinaryMatrix(grid: list[list[int]]) -> int:
     n = len(grid)
+    # Why check both corners? If START or END is blocked (1),
+    # no path can possibly exist — fail fast before BFS.
     if grid[0][0] == 1 or grid[n-1][n-1] == 1:
         return -1
 
@@ -702,8 +766,11 @@ def shortestPathBinaryMatrix(grid: list[list[int]]) -> int:
 
         for dr, dc in directions:
             nr, nc = r + dr, c + dc
+            # Why `grid[nr][nc] == 0`? Only unvisited open cells.
+            # We mark visited by setting to 1 (same as blocked),
+            # so this check handles BOTH "is it open?" and "is it unvisited?"
             if 0 <= nr < n and 0 <= nc < n and grid[nr][nc] == 0:
-                grid[nr][nc] = 1
+                grid[nr][nc] = 1  # Mark visited (early marking, like BFS Template A)
                 queue.append((nr, nc, length + 1))
 
     return -1
@@ -734,9 +801,15 @@ def ladderLength(beginWord: str, endWord: str, wordList: list[str]) -> int:
             return length
 
         # Try all single-letter transformations
+        # Why iterate 26 letters × word length, instead of checking all pairs?
+        # Checking all pairs is O(n²). This is O(26 × L × n) which is better
+        # when word list is large. Each transformation is O(L) string ops.
         for i in range(len(word)):
             for c in 'abcdefghijklmnopqrstuvwxyz':
                 new_word = word[:i] + c + word[i+1:]
+                # Why check `word_set` AND `visited`?
+                # word_set = valid dictionary words. visited = already queued.
+                # Both must pass: word must exist AND not already processed.
                 if new_word in word_set and new_word not in visited:
                     visited.add(new_word)
                     queue.append((new_word, length + 1))
@@ -797,6 +870,8 @@ def orangesRotting(grid: list[list[int]]) -> int:
             elif grid[r][c] == 1:
                 fresh += 1
 
+    # Why return 0 if no fresh oranges? Nothing to rot → 0 minutes.
+    # Edge case: grid might be all empty or all already rotten.
     if fresh == 0:
         return 0
 
@@ -809,11 +884,15 @@ def orangesRotting(grid: list[list[int]]) -> int:
 
         for dr, dc in directions:
             nr, nc = r + dr, c + dc
+            # Why `grid[nr][nc] == 1`? Only fresh oranges can be rotted.
+            # Rotten (2) or empty (0) cells are skipped.
             if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 1:
-                grid[nr][nc] = 2
+                grid[nr][nc] = 2  # Rot it (also serves as "visited" mark)
                 fresh -= 1
                 queue.append((nr, nc, time + 1))
 
+    # Why `fresh == 0`? If any fresh orange remains unreachable
+    # from all rotten sources, it's impossible → return -1.
     return max_time if fresh == 0 else -1
 ```
 
@@ -869,16 +948,20 @@ def canFinish(numCourses: int, prerequisites: list[list[int]]) -> bool:
     for course, prereq in prerequisites:
         graph[prereq].append(course)
 
-    # 0 = unvisited, 1 = visiting, 2 = visited
+    # 3-state system (same idea as WHITE/GRAY/BLACK above):
+    # 0 = unvisited, 1 = visiting (in current DFS path), 2 = fully visited
     state = [0] * numCourses
 
     def has_cycle(course):
-        if state[course] == 1:  # Currently visiting = cycle
+        if state[course] == 1:
+            # Currently in our DFS path — we've circled back! Cycle!
             return True
-        if state[course] == 2:  # Already completed
+        if state[course] == 2:
+            # Already fully explored in a previous DFS — no cycle from here.
+            # This is a KEY optimization: without it, we'd re-explore nodes.
             return False
 
-        state[course] = 1  # Mark as visiting
+        state[course] = 1  # Mark as "currently exploring"
 
         for next_course in graph[course]:
             if has_cycle(next_course):
@@ -941,7 +1024,12 @@ def hasCycle(n: int, edges: list[list[int]]) -> bool:
             if neighbor not in visited:
                 if dfs(neighbor, node):
                     return True
-            elif neighbor != parent:  # Back edge to non-parent = cycle
+            elif neighbor != parent:
+                # Why `!= parent`? In an undirected graph, edge (A, B)
+                # appears in BOTH adjacency lists. When we DFS from A to B,
+                # B's neighbor list includes A. That's not a cycle — it's just
+                # the edge we came from. We only have a cycle if we reach a
+                # VISITED node that ISN'T our immediate parent.
                 return True
 
         return False
@@ -1048,24 +1136,32 @@ def alienOrder(words: list[str]) -> str:
 ```python
 def isBipartite(graph: list[list[int]]) -> bool:
     n = len(graph)
-    color = [0] * n  # 0 = uncolored, 1 or -1 = colors
+    # 0 = uncolored, 1 or -1 = two "team" colors.
+    # Bipartite = can split all nodes into two groups where
+    # every edge connects different groups (like a two-team game).
+    color = [0] * n
 
     def bfs(start):
         queue = deque([start])
-        color[start] = 1
+        color[start] = 1  # Assign first team
 
         while queue:
             node = queue.popleft()
 
             for neighbor in graph[node]:
                 if color[neighbor] == 0:
+                    # Uncolored: assign OPPOSITE color (other team)
                     color[neighbor] = -color[node]
                     queue.append(neighbor)
                 elif color[neighbor] == color[node]:
+                    # SAME color as me = conflict! Two connected nodes
+                    # on the same team → not bipartite.
                     return False
 
         return True
 
+    # Why loop over all nodes? Graph may be disconnected.
+    # Each component must be independently bipartite.
     for i in range(n):
         if color[i] == 0:
             if not bfs(i):
@@ -1085,8 +1181,11 @@ def isBipartite_dfs(graph: list[list[int]]) -> bool:
 
         for neighbor in graph[node]:
             if color[neighbor] == c:
+                # Same color = conflict → not bipartite
                 return False
             if color[neighbor] == 0 and not dfs(neighbor, -c):
+                # Uncolored: try assigning opposite color (-c).
+                # If that fails (returns False), conflict found deeper.
                 return False
 
         return True
@@ -1125,16 +1224,22 @@ def networkDelayTime(times: list[list[int]], n: int, k: int) -> int:
     while heap:
         dist, node = heapq.heappop(heap)
 
+        # Why `dist > distances[node]`? Skip stale heap entries.
+        # We may have pushed this node multiple times with decreasing
+        # distances. Only the first pop (smallest dist) matters.
         if dist > distances[node]:
             continue
 
         for neighbor, weight in graph[node]:
             new_dist = dist + weight
+            # Relaxation: found a shorter path to neighbor?
             if new_dist < distances[neighbor]:
                 distances[neighbor] = new_dist
                 heapq.heappush(heap, (new_dist, neighbor))
 
     max_dist = max(distances.values())
+    # Why check for inf? If any node is unreachable (distance = inf),
+    # the signal can't reach all nodes → return -1.
     return max_dist if max_dist < float('inf') else -1
 ```
 
@@ -1164,10 +1269,15 @@ def findCheapestPrice(n: int, flights: list[list[int]], src: int, dst: int, k: i
         if node == dst:
             return cost
 
+        # Why `stops > k`? We've used more intermediate stops than allowed.
+        # k stops = k+1 flights. This prunes paths that are too long.
         if stops > k:
             continue
 
-        # Skip if we've reached this node with fewer stops
+        # Why track `best` stops instead of just visited?
+        # Unlike standard Dijkstra, a longer path with fewer stops might
+        # lead to a cheaper overall route. We only skip if we've already
+        # reached this node with FEWER stops (strictly better).
         if node in best and best[node] <= stops:
             continue
         best[node] = stops
@@ -1198,13 +1308,22 @@ def cloneGraph(node: Node) -> Node:
     if not node:
         return None
 
+    # Map: original node → its clone. Serves double duty:
+    # 1. Prevents infinite loops (acts as "visited")
+    # 2. Lets us reuse already-cloned nodes for neighbor links
     cloned = {}
 
     def dfs(original):
+        # Why check `original in cloned`?
+        # If already cloned, return the existing copy.
+        # Without this, cycles in the graph cause infinite recursion.
         if original in cloned:
             return cloned[original]
 
         copy = Node(original.val)
+        # MUST register clone BEFORE recursing into neighbors.
+        # If we wait until after, a cycle would recurse back here
+        # and not find the clone, causing infinite recursion.
         cloned[original] = copy
 
         for neighbor in original.neighbors:
@@ -1230,11 +1349,17 @@ def pacificAtlantic(heights: list[list[int]]) -> list[list[int]]:
     pacific = set()
     atlantic = set()
 
+    # KEY TRICK: Instead of "from each cell, can water reach the ocean?"
+    # (expensive), we reverse it: "from each ocean, which cells can flow TO it?"
+    # Water flows downhill, so reverse-flow = go UPHILL from ocean edges.
     def dfs(r, c, visited, prev_height):
         if (r, c) in visited:
             return
         if r < 0 or r >= rows or c < 0 or c >= cols:
             return
+        # Why `< prev_height`? We're going UPHILL (reverse flow).
+        # Water flows from high to low, so tracing backward means
+        # we can only move to cells >= current height.
         if heights[r][c] < prev_height:
             return
 
@@ -1255,7 +1380,8 @@ def pacificAtlantic(heights: list[list[int]]) -> list[list[int]]:
     for r in range(rows):
         dfs(r, cols - 1, atlantic, 0)
 
-    # Intersection
+    # Intersection: cells reachable from BOTH oceans = cells where
+    # water can flow to both Pacific AND Atlantic.
     return list(pacific & atlantic)
 ```
 
@@ -1272,26 +1398,32 @@ def solve(board: list[list[str]]) -> None:
 
     rows, cols = len(board), len(board[0])
 
+    # KEY INSIGHT: Instead of "find surrounded O's" (hard),
+    # flip the question: "find UN-surrounded O's" (easy — they touch an edge).
+    # Mark edge-connected O's as safe, then capture the rest.
     def dfs(r, c):
         if r < 0 or r >= rows or c < 0 or c >= cols:
             return
+        # Why `!= 'O'`? Stop if it's 'X' (wall) or 'E' (already marked safe).
         if board[r][c] != 'O':
             return
 
-        board[r][c] = 'E'  # Mark as escaped (connected to edge)
+        board[r][c] = 'E'  # 'E' = Escaped (safe, connected to edge)
 
         for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
             dfs(r + dr, c + dc)
 
-    # Mark O's connected to edge as escaped
+    # Start DFS from ALL edge cells — any O connected to an edge escapes.
     for r in range(rows):
-        dfs(r, 0)
-        dfs(r, cols - 1)
+        dfs(r, 0)         # Left edge
+        dfs(r, cols - 1)  # Right edge
     for c in range(cols):
-        dfs(0, c)
-        dfs(rows - 1, c)
+        dfs(0, c)         # Top edge
+        dfs(rows - 1, c)  # Bottom edge
 
-    # Convert: O -> X (captured), E -> O (escaped)
+    # Final pass — three-way conversion:
+    # O → X (not connected to edge = captured/surrounded)
+    # E → O (was connected to edge = restore to original)
     for r in range(rows):
         for c in range(cols):
             if board[r][c] == 'O':
@@ -1633,5 +1765,49 @@ Where V = vertices, E = edges, R = rows, C = columns
 3. Do LC 994, 542 (multi-source BFS)
 4. Master LC 743 (Dijkstra)
 5. Try LC 127 (advanced BFS)
+
+---
+
+## Appendix: Conditional Quick Reference
+
+### BFS Conditionals
+
+| Condition | Where Used | Why |
+|-----------|-----------|-----|
+| `neighbor not in visited` (before enqueue) | BFS Template A | Early marking: each node queued exactly once, saves memory |
+| `level_size = len(queue)` | BFS with Levels | Snapshot separates current level from next level's nodes |
+| `grid[nr][nc] == 0` | Binary Matrix BFS | Checks both "open cell" and "unvisited" (visited cells marked as 1) |
+| `grid[nr][nc] == 1` | Rotting Oranges | Only fresh oranges can be rotted; rotten/empty are skipped |
+| `fresh == 0` | Rotting Oranges (end) | If any fresh orange is unreachable, return -1 |
+| `distances[nr][nc] > distances[r][c] + 1` | Multi-Source BFS / 01 Matrix | Doubles as visited check: only process if found shorter path |
+
+### DFS Conditionals
+
+| Condition | Where Used | Why |
+|-----------|-----------|-----|
+| `node in visited` (after pop) | Iterative DFS | Late marking: stack may contain duplicates; skip already-processed |
+| `neighbor not in path` | All Paths DFS | Allow revisiting on different paths (unlike permanent visited set) |
+| `neighbor != parent` | Undirected Cycle | Don't count the edge we came from as a cycle |
+| `color[neighbor] == GRAY` | DFS Topo Sort | Back edge to ancestor in current path = cycle detected |
+| `color[neighbor] == color[node]` | Bipartite Check | Same-team conflict = not bipartite |
+
+### Shortest Path Conditionals
+
+| Condition | Where Used | Why |
+|-----------|-----------|-----|
+| `dist > distances[node]` | Dijkstra | Skip stale heap entries; first pop is always shortest |
+| `new_dist < distances[neighbor]` | Dijkstra Relaxation | Only push if found a strictly shorter path |
+| `stops > k` | Cheapest Flights | Prune paths exceeding the stop limit |
+| `best[node] <= stops` | Cheapest Flights | Skip if already reached with fewer stops |
+
+### Special Graph Conditionals
+
+| Condition | Where Used | Why |
+|-----------|-----------|-----|
+| `original in cloned` | Clone Graph | Prevents infinite loops on cycles; reuses existing clones |
+| `heights[r][c] < prev_height` | Pacific Atlantic | Reverse flow: only go uphill (water flows downhill) |
+| `board[r][c] != 'O'` | Surrounded Regions | Stop at walls (X) or already-safe cells (E) |
+| `in_degree[neighbor] == 0` | Kahn's Topo Sort | All prerequisites done → neighbor is ready |
+| `len(result) != num_nodes` | Kahn's Cycle Check | Nodes stuck in cycles never reach in-degree 0 |
 
 Good luck with your interview preparation!

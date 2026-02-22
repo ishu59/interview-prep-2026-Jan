@@ -138,13 +138,19 @@ def next_greater_element(nums):
     stack = []  # stores indices; nums[stack[-1]] is decreasing from bottom to top
 
     for i in range(n):
-        # Pop all elements smaller than current -- current is their NGE
+        # Pop all elements smaller than current -- current is their NGE.
+        # Why `>` and not `>=`? We want STRICTLY greater. If we used `>=`,
+        # an equal element would wrongly count as "greater."
+        # Why `stack` check first? Short-circuit: if stack is empty, nothing to pop.
+        # Can this loop run forever? No -- each element is pushed once and popped
+        # at most once across the entire outer loop, so total pops <= n.
         while stack and nums[i] > nums[stack[-1]]:
             idx = stack.pop()
             result[idx] = nums[i]
         stack.append(i)
 
-    # Elements remaining in stack have no next greater element (result stays -1)
+    # Elements remaining in stack have no next greater element (result stays -1).
+    # Why? They were never popped, meaning no future element was larger.
     return result
 ```
 
@@ -169,7 +175,9 @@ def next_smaller_element(nums):
     stack = []  # stores indices; nums[stack[-1]] is increasing from bottom to top
 
     for i in range(n):
-        # Pop all elements larger than current -- current is their NSE
+        # Pop all elements larger than current -- current is their NSE.
+        # Why `<` and not `<=`? We want STRICTLY smaller. Equal is not "smaller."
+        # Mirror of Template 1: just flip the comparison direction.
         while stack and nums[i] < nums[stack[-1]]:
             idx = stack.pop()
             result[idx] = nums[i]
@@ -200,18 +208,25 @@ def sliding_window_maximum(nums, k):
     dq = deque()  # stores indices; nums[dq[0]] >= nums[dq[1]] >= ...
 
     for i in range(len(nums)):
-        # Remove elements outside the window from the front
+        # Remove elements outside the window from the front.
+        # Why `<= i - k` and not `< i - k`? The window [i-k+1, i] has leftmost
+        # valid index i-k+1. So index i-k is OUT. dq[0] <= i-k means dq[0] < i-k+1,
+        # i.e., it's outside the window. Using `<` would keep one stale element.
         while dq and dq[0] <= i - k:
             dq.popleft()
 
-        # Remove elements smaller than current from the back
-        # (they can never be the max while current element exists in window)
+        # Remove elements smaller than current from the back.
+        # Why `>=` and not just `>`? If nums[dq[-1]] == nums[i], the older equal
+        # element will leave the window sooner, so we prefer keeping the newer one.
+        # This is safe: we never lose a potential max because the new element is
+        # equally large AND will stay in the window longer.
         while dq and nums[i] >= nums[dq[-1]]:
             dq.pop()
 
         dq.append(i)
 
-        # Window is fully formed once we've seen at least k elements
+        # Why `i >= k - 1`? The first full window spans indices [0, k-1].
+        # Before that, we haven't seen k elements yet, so no result to record.
         if i >= k - 1:
             result.append(nums[dq[0]])
 
@@ -299,7 +314,9 @@ def nextGreaterElement(nums1, nums2):
     stack = []    # monotonic decreasing stack (stores values, not indices)
 
     for num in nums2:
-        # Pop all elements smaller than current; current is their NGE
+        # Pop all elements smaller than current; current is their NGE.
+        # Why store values instead of indices here? Because nums2 has all distinct
+        # elements and we only need a value-to-value mapping (no result array).
         while stack and num > stack[-1]:
             smaller = stack.pop()
             nge_map[smaller] = num
@@ -372,13 +389,16 @@ def nextGreaterElements(nums):
     result = [-1] * n
     stack = []  # stores indices
 
-    # Iterate twice to handle the circular nature
+    # Why iterate 2*n times? In a circular array, element at index n-1 might
+    # have its NGE at index 0. Two passes simulate the wrap-around.
     for i in range(2 * n):
-        # Use modulo to wrap around
+        # Why `i % n`? Maps indices n..2n-1 back to 0..n-1, simulating circularity.
         while stack and nums[i % n] > nums[stack[-1]]:
             idx = stack.pop()
             result[idx] = nums[i % n]
-        # Only push indices from the first pass
+        # Why only push during the first pass (i < n)?
+        # The second pass exists only to RESOLVE remaining elements on the stack.
+        # Pushing again would create duplicate indices and waste work.
         if i < n:
             stack.append(i)
 
@@ -432,8 +452,12 @@ def dailyTemperatures(temperatures):
     stack = []  # stores indices of days waiting for a warmer day
 
     for i in range(n):
+        # Why `>` and not `>=`? "Warmer" means strictly higher temperature.
+        # A day with the same temperature does NOT resolve the wait.
         while stack and temperatures[i] > temperatures[stack[-1]]:
             prev_day = stack.pop()
+            # Why `i - prev_day` is always positive: i > prev_day is guaranteed
+            # because we only push earlier indices onto the stack.
             answer[prev_day] = i - prev_day  # number of days waited
         stack.append(i)
 
@@ -501,15 +525,22 @@ class StockSpanner:
         self.idx = 0
 
     def next(self, price):
-        # Pop all prices that are ≤ current price
+        # Why `<=` and not `<`? The span includes days with EQUAL price.
+        # A day with the same price doesn't "block" the span -- only a
+        # strictly greater price does. So we pop equal prices too.
         while self.stack and self.stack[-1][0] <= price:
             self.stack.pop()
 
-        # Span = distance from current index to the previous greater element
+        # Span = distance from current index to the previous greater element.
         if self.stack:
+            # Why `self.idx - self.stack[-1][1]`? The stack top is the most
+            # recent day with a STRICTLY greater price. Everything between
+            # that day and today has price <= today's price.
             span = self.idx - self.stack[-1][1]
         else:
-            span = self.idx + 1  # no previous greater → span is entire history
+            # Why `self.idx + 1`? No previous greater price exists, so the
+            # span covers every day from day 0 to today (inclusive).
+            span = self.idx + 1
 
         self.stack.append((price, self.idx))
         self.idx += 1
@@ -602,12 +633,16 @@ def validSubarrays(nums):
     stack = []  # monotonic increasing stack (stores indices)
 
     for i in range(n):
+        # Why `<` (strictly less)? A subarray starting at idx is invalid once we
+        # hit an element SMALLER than nums[idx]. Equal elements are fine (>= nums[idx]).
         while stack and nums[i] < nums[stack[-1]]:
             idx = stack.pop()
             nse[idx] = i
         stack.append(i)
 
-    # For element at index i, number of valid subarrays starting at i = nse[i] - i
+    # For element at index i, number of valid subarrays starting at i = nse[i] - i.
+    # Why? Subarrays [i..i], [i..i+1], ..., [i..nse[i]-1] are all valid.
+    # That's nse[i] - i subarrays. If nse[i] == n, all subarrays to the end are valid.
     result = 0
     for i in range(n):
         result += nse[i] - i
@@ -666,13 +701,23 @@ def largestRectangleArea(heights):
     stack = []  # monotonic increasing stack (stores indices)
     max_area = 0
 
-    # Append 0 as a sentinel to force all remaining bars to be processed
+    # Why append a sentinel of 0? Without it, bars that never meet a shorter bar
+    # to their right stay in the stack forever and are never processed.
+    # A height of 0 is shorter than everything, so it forces all remaining bars out.
     heights_extended = heights + [0]
 
     for i in range(len(heights_extended)):
+        # Why `<`? We pop when the current bar is SHORTER than the stack top.
+        # This means the popped bar's rectangle can't extend further right.
+        # Why not `<=`? Using `<` keeps equal-height bars in the stack.
+        # The rightmost equal bar will eventually compute the correct full width.
         while stack and heights_extended[i] < heights_extended[stack[-1]]:
             h = heights_extended[stack.pop()]
-            # Width: from the bar after the new stack top, to bar before i
+            # Why `i if not stack`? If the stack is empty after popping, this bar
+            # was the shortest seen so far -- its rectangle extends from index 0
+            # all the way to i-1, giving width = i.
+            # Why `i - stack[-1] - 1`? The rectangle spans from (stack[-1] + 1)
+            # to (i - 1). We subtract 1 to exclude both boundary bars.
             w = i if not stack else i - stack[-1] - 1
             max_area = max(max_area, h * w)
         stack.append(i)
@@ -738,6 +783,9 @@ def maximalRectangle(matrix):
     Time: O(rows * cols)
     Space: O(cols)
     """
+    # Why check both `not matrix` and `not matrix[0]`?
+    # `not matrix` catches empty input []. `not matrix[0]` catches [[]]
+    # (a matrix with one empty row). Either way, no area is possible.
     if not matrix or not matrix[0]:
         return 0
 
@@ -748,6 +796,10 @@ def maximalRectangle(matrix):
     for row in matrix:
         # Build histogram heights
         for j in range(cols):
+            # Why `+= 1` for '1' but `= 0` for '0'?
+            # A '1' extends the bar from the row above (consecutive 1s stack up).
+            # A '0' breaks the streak -- the bar resets to height 0, not -1,
+            # because you can't build a rectangle through a gap.
             if row[j] == '1':
                 heights[j] += 1
             else:
@@ -759,9 +811,10 @@ def maximalRectangle(matrix):
     return max_area
 
 def _largest_rectangle(heights):
+    """Same logic as LC 84 -- see detailed comments in Problem 3.1 above."""
     stack = []
     max_area = 0
-    extended = heights + [0]
+    extended = heights + [0]  # Sentinel to flush remaining bars
 
     for i in range(len(extended)):
         while stack and extended[i] < extended[stack[-1]]:
@@ -832,18 +885,27 @@ def trap(height):
     water = 0
 
     for i in range(len(height)):
-        # While current bar is taller than the bar at stack top,
-        # we can potentially trap water
+        # Why `>`? We need a bar TALLER than the valley floor to form a right wall.
+        # Equal height doesn't create a valley to trap water in.
         while stack and height[i] > height[stack[-1]]:
             valley = stack.pop()
 
+            # Why check `if not stack`? After popping the valley, if the stack is
+            # empty, there's no left wall. Water needs BOTH a left and right wall
+            # to be trapped. Without a left wall, water flows off the left side.
             if not stack:
-                break  # no left wall, water flows off the left
+                break
 
             left_wall = stack[-1]
-            # Height of trapped water
+            # Why `min(left_wall_height, right_wall_height)`? Water level is
+            # limited by the SHORTER wall (water would overflow the shorter one).
+            # Why subtract `height[valley]`? The valley floor displaces water.
+            # Can bounded_height be negative? No -- the valley was popped because
+            # height[i] > height[valley], and left_wall >= valley (stack invariant),
+            # so min(left, right) >= height[valley].
             bounded_height = min(height[left_wall], height[i]) - height[valley]
-            # Width between the two walls
+            # Why `i - left_wall - 1`? The water spans between the two walls,
+            # not including the walls themselves.
             width = i - left_wall - 1
             water += bounded_height * width
 
@@ -938,18 +1000,21 @@ def maxSlidingWindow(nums, k):
     result = []
 
     for i in range(len(nums)):
-        # Remove indices that are outside the window
+        # Why `<= i - k`? Window covers [i-k+1, i]. Index i-k is one step
+        # outside. So any index <= i-k is stale and must be removed.
         while dq and dq[0] <= i - k:
             dq.popleft()
 
-        # Remove indices whose values are smaller than current
-        # (they can never be the window max)
+        # Why `>=` (not `>`)? If the back element equals nums[i], the back
+        # element is older and will expire from the window sooner. The new
+        # element is equally large but fresher, so it's strictly better to keep.
         while dq and nums[i] >= nums[dq[-1]]:
             dq.pop()
 
         dq.append(i)
 
-        # Start recording results once the first window is complete
+        # Why `i >= k - 1`? The first valid window is [0..k-1], which completes
+        # when i reaches k-1. Before that, we don't have k elements yet.
         if i >= k - 1:
             result.append(nums[dq[0]])
 

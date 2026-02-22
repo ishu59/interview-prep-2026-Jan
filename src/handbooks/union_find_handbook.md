@@ -146,8 +146,14 @@ class UnionFind:
 
     def find(self, x: int) -> int:
         """Find root with path compression."""
+        # Why `parent[x] != x`? Each node points to its parent. A root
+        # points to itself (parent[x] == x). If parent[x] != x, then x
+        # is NOT the root, so we recurse upward to find the true root.
         if self.parent[x] != x:
-            self.parent[x] = self.find(self.parent[x])  # Path compression
+            # Path compression: instead of just returning the root, we
+            # re-point x directly to the root. This flattens the tree so
+            # future find() calls on x (or any node along this path) are O(1).
+            self.parent[x] = self.find(self.parent[x])
         return self.parent[x]
 
     def union(self, x: int, y: int) -> bool:
@@ -157,15 +163,27 @@ class UnionFind:
         root_x = self.find(x)
         root_y = self.find(y)
 
+        # Why check `root_x == root_y`? If both elements already share the
+        # same root, they are already in the same set. Merging would be a
+        # no-op, so we return False to signal "no merge happened." This is
+        # also the basis for cycle detection: if two nodes share a root
+        # BEFORE we add the edge between them, that edge creates a cycle.
         if root_x == root_y:
             return False  # Already in same set
 
-        # Union by rank
+        # Union by rank: attach the shorter tree under the taller tree.
+        # Why? Attaching the shorter tree under the taller one keeps the
+        # overall tree height small. If we always attached the taller under
+        # the shorter, the tree would grow tall and find() would be slow.
         if self.rank[root_x] < self.rank[root_y]:
             self.parent[root_x] = root_y
         elif self.rank[root_x] > self.rank[root_y]:
             self.parent[root_y] = root_x
         else:
+            # Why increment rank only when equal? When ranks differ, the
+            # taller tree absorbs the shorter one and its height does not
+            # change. Only when both trees have the SAME height does the
+            # merged tree become one level taller, so we increment.
             self.parent[root_y] = root_x
             self.rank[root_x] += 1
 
@@ -192,6 +210,8 @@ class UnionFindWithSize:
         self.count = n       # Number of components
 
     def find(self, x: int) -> int:
+        # Same path compression logic as Template A: if x is not its own
+        # root, recurse to find the root, then re-point x directly to it.
         if self.parent[x] != x:
             self.parent[x] = self.find(self.parent[x])
         return self.parent[x]
@@ -200,15 +220,21 @@ class UnionFindWithSize:
         root_x = self.find(x)
         root_y = self.find(y)
 
+        # Already in the same component -- nothing to merge.
         if root_x == root_y:
             return False
 
-        # Union by size (attach smaller to larger)
+        # Union by size: attach the smaller component under the larger one.
+        # Why swap? After the swap, root_x is guaranteed to be the larger
+        # root. This simplifies the logic to a single attachment line below.
         if self.size[root_x] < self.size[root_y]:
             root_x, root_y = root_y, root_x
 
         self.parent[root_y] = root_x
         self.size[root_x] += self.size[root_y]
+        # Why decrement count? We started with n components. Each successful
+        # union merges two components into one, reducing the total by 1.
+        # Failed unions (root_x == root_y) do not reach here.
         self.count -= 1
 
         return True
@@ -241,10 +267,16 @@ class WeightedUnionFind:
         """
         Returns (root, weight_to_root).
         """
+        # Same parent[x] != x check: x is not a root, so recurse upward.
+        # But here we also accumulate weights along the path so that
+        # weight[x] stores the total weight from x to the root.
         if self.parent[x] != x:
             root, weight_to_root = self.find(self.parent[x])
             self.parent[x] = root
-            self.weight[x] += weight_to_root  # Path compression with weight update
+            # Path compression with weight update: x previously stored its
+            # weight to its old parent. Now we add the old parent's weight
+            # to the root, so x's weight reflects the full path to the root.
+            self.weight[x] += weight_to_root
         return self.parent[x], self.weight[x]
 
     def union(self, x: int, y: int, w: float) -> bool:
@@ -254,6 +286,8 @@ class WeightedUnionFind:
         root_x, weight_x = self.find(x)
         root_y, weight_y = self.find(y)
 
+        # Already in the same set -- the relationship between x and y is
+        # already determined by existing edges, so skip.
         if root_x == root_y:
             return False
 
@@ -272,6 +306,8 @@ class WeightedUnionFind:
         root_x, weight_x = self.find(x)
         root_y, weight_y = self.find(y)
 
+        # Different roots means x and y are in unrelated sets -- there is
+        # no chain of equations connecting them, so the answer is undefined.
         if root_x != root_y:
             return -1.0
 
@@ -313,9 +349,11 @@ class GridUnionFind:
         root_x = self.find(x)
         root_y = self.find(y)
 
+        # Same component already -- merging would double-count.
         if root_x == root_y:
             return False
 
+        # Standard union by rank (see Template A for detailed explanation).
         if self.rank[root_x] < self.rank[root_y]:
             self.parent[root_x] = root_y
         elif self.rank[root_x] > self.rank[root_y]:
@@ -324,6 +362,7 @@ class GridUnionFind:
             self.parent[root_y] = root_x
             self.rank[root_x] += 1
 
+        # Two components just became one, so total decreases by 1.
         self.count -= 1
         return True
 
@@ -352,6 +391,9 @@ class DynamicUnionFind:
         self.rank = {}
 
     def find(self, x) -> any:
+        # Why `x not in self.parent`? Unlike array-based UF, nodes are not
+        # pre-allocated. The first time we see a node, we lazily create it
+        # as its own root. This allows nodes to be strings, tuples, etc.
         if x not in self.parent:
             self.parent[x] = x
             self.rank[x] = 0
@@ -368,6 +410,7 @@ class DynamicUnionFind:
         if root_x == root_y:
             return False
 
+        # Standard union by rank (see Template A for detailed explanation).
         if self.rank[root_x] < self.rank[root_y]:
             self.parent[root_x] = root_y
         elif self.rank[root_x] > self.rank[root_y]:
@@ -477,7 +520,11 @@ def findCircleNum(isConnected: list[list[int]]) -> int:
     uf = UnionFindWithSize(n)
 
     for i in range(n):
+        # Why `range(i + 1, n)` and not `range(n)`? The adjacency matrix is
+        # symmetric: isConnected[i][j] == isConnected[j][i]. Starting j at
+        # i+1 avoids processing each edge twice and avoids the i==j diagonal.
         for j in range(i + 1, n):
+            # Only union if there is an actual connection between i and j.
             if isConnected[i][j] == 1:
                 uf.union(i, j)
 
@@ -499,9 +546,13 @@ def earliestAcq(logs: list[list[int]], n: int) -> int:
 
     for timestamp, x, y in logs:
         uf.union(x, y)
+        # Why `== 1`? We started with n separate components. Each union
+        # reduces the count. When count reaches 1, everyone is in a single
+        # group -- that timestamp is our answer.
         if uf.get_count() == 1:
             return timestamp
 
+    # If we process all logs and count > 1, not everyone became connected.
     return -1
 ```
 
@@ -523,7 +574,9 @@ def numIslands2(m: int, n: int, positions: list[list[int]]) -> list[int]:
     directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 
     for r, c in positions:
-        if grid[r][c] == 1:  # Already land
+        # Skip duplicate land operations -- this cell is already land,
+        # so the island count has not changed.
+        if grid[r][c] == 1:
             result.append(uf.count)
             continue
 
@@ -533,6 +586,10 @@ def numIslands2(m: int, n: int, positions: list[list[int]]) -> list[int]:
         # Try to connect with adjacent land
         for dr, dc in directions:
             nr, nc = r + dr, c + dc
+            # Why `0 <= nr < m and 0 <= nc < n`? Boundary check -- the
+            # neighbor must be inside the grid. Why `grid[nr][nc] == 1`?
+            # We only union with cells that are already land. Water cells
+            # are not part of any island yet.
             if 0 <= nr < m and 0 <= nc < n and grid[nr][nc] == 1:
                 uf.union(r, c, nr, nc)
 
@@ -560,9 +617,11 @@ def largestIsland(grid: list[list[int]]) -> int:
     # Union all existing land cells
     for r in range(n):
         for c in range(n):
+            # Only process land cells -- water cells are not in any island.
             if grid[r][c] == 1:
                 for dr, dc in directions:
                     nr, nc = r + dr, c + dc
+                    # Boundary check + neighbor must also be land.
                     if 0 <= nr < n and 0 <= nc < n and grid[nr][nc] == 1:
                         uf.union(index(r, c), index(nr, nc))
 
@@ -571,8 +630,11 @@ def largestIsland(grid: list[list[int]]) -> int:
 
     for r in range(n):
         for c in range(n):
+            # Only consider flipping water cells to land.
             if grid[r][c] == 0:
-                # Find unique adjacent islands
+                # Find unique adjacent islands. Why a set of roots? A single
+                # water cell might border the SAME island from multiple sides.
+                # Using a set deduplicates so we don't double-count that island.
                 adjacent_roots = set()
                 for dr, dc in directions:
                     nr, nc = r + dr, c + dc
@@ -583,7 +645,8 @@ def largestIsland(grid: list[list[int]]) -> int:
                 size = 1 + sum(uf.get_size(root) for root in adjacent_roots)
                 max_size = max(max_size, size)
 
-    # Edge case: entire grid is 1s
+    # Edge case: if max_size is still 0, there were no water cells to flip,
+    # meaning the entire grid is already land.
     if max_size == 0:
         max_size = n * n
 
@@ -602,14 +665,19 @@ def largestIsland(grid: list[list[int]]) -> int:
 
 ```python
 def validTree(n: int, edges: list[list[int]]) -> bool:
-    # Tree has exactly n-1 edges and is connected
+    # Why n-1? A tree with n nodes always has exactly n-1 edges. Fewer
+    # means disconnected; more means at least one cycle. This is a quick
+    # necessary-condition check before doing any union-find work.
     if len(edges) != n - 1:
         return False
 
     uf = UnionFind(n)
 
     for u, v in edges:
-        if not uf.union(u, v):  # Cycle detected
+        # Why does `union returning False` mean cycle? If u and v already
+        # share the same root, they are already connected. Adding another
+        # edge between them creates a cycle -- not allowed in a tree.
+        if not uf.union(u, v):
             return False
 
     return True
@@ -624,9 +692,13 @@ def validTree(n: int, edges: list[list[int]]) -> bool:
 ```python
 def findRedundantConnection(edges: list[list[int]]) -> list[int]:
     n = len(edges)
-    uf = UnionFind(n + 1)  # 1-indexed
+    # Why n + 1? The problem uses 1-indexed nodes (1 to n), so we
+    # allocate one extra slot to avoid off-by-one errors.
+    uf = UnionFind(n + 1)
 
     for u, v in edges:
+        # The first edge whose union fails is the redundant one: u and v
+        # are already connected, so this edge creates a cycle.
         if not uf.union(u, v):
             return [u, v]
 
@@ -645,8 +717,12 @@ def findRedundantDirectedConnection(edges: list[list[int]]) -> list[int]:
     parent = [0] * (n + 1)
     candidate1 = candidate2 = None
 
-    # Find node with two parents
+    # Find node with two parents. In a valid rooted tree, every node
+    # (except the root) has exactly one parent. If any node v already
+    # has a parent when we encounter edge u->v, then v has TWO parents.
     for u, v in edges:
+        # Why `parent[v] != 0`? parent[v] was initialized to 0 (no parent).
+        # If it is nonzero, v already has a parent -- this is the conflict.
         if parent[v] != 0:
             candidate1 = [parent[v], v]
             candidate2 = [u, v]
@@ -656,15 +732,19 @@ def findRedundantDirectedConnection(edges: list[list[int]]) -> list[int]:
     uf = UnionFind(n + 1)
 
     for u, v in edges:
+        # Skip candidate2 to test whether the graph is valid without it.
         if [u, v] == candidate2:
-            continue  # Skip second candidate
+            continue
 
         if not uf.union(u, v):
-            # Found cycle
+            # Cycle found even after removing candidate2. If a two-parent
+            # conflict existed, candidate1 must be the real culprit.
+            # Otherwise, this edge [u, v] itself is the redundant one.
             if candidate1:
                 return candidate1
             return [u, v]
 
+    # No cycle after removing candidate2, so candidate2 was the problem.
     return candidate2
 ```
 
@@ -691,7 +771,12 @@ def accountsMerge(accounts: list[list[str]]) -> list[list[str]]:
             if email not in email_to_id:
                 email_to_id[email] = i
             email_to_name[email] = name
-            uf.union(email, account[1])  # Union all emails in account
+            # Why union with account[1] (the first email in this account)?
+            # All emails within the same account belong to the same person.
+            # By unioning every email with the first email, we link them all
+            # into one component. If any email also appears in another
+            # account, it bridges the two accounts into one group.
+            uf.union(email, account[1])
 
     # Group emails by root
     groups = defaultdict(list)
@@ -718,6 +803,7 @@ def accountsMerge(accounts: list[list[str]]) -> list[list[str]]:
 def areSentencesSimilarTwo(
     sentence1: list[str], sentence2: list[str], similarPairs: list[list[str]]
 ) -> bool:
+    # Sentences must have the same number of words to be compared.
     if len(sentence1) != len(sentence2):
         return False
 
@@ -727,6 +813,9 @@ def areSentencesSimilarTwo(
         uf.union(w1, w2)
 
     for w1, w2 in zip(sentence1, sentence2):
+        # Why `w1 != w2` first? Identical words are trivially similar --
+        # no need to check the union-find. If they differ, they must be
+        # transitively connected through similarity pairs.
         if w1 != w2 and not uf.connected(w1, w2):
             return False
 
@@ -752,8 +841,13 @@ def calcEquation(
     uf = {}
 
     def find(x):
+        # Lazy initialization: first time seeing x, it becomes its own
+        # root with weight 1.0 (x / x = 1).
         if x not in uf:
             uf[x] = (x, 1.0)  # (parent, weight)
+        # Path compression for weighted UF: if x is not the root,
+        # recursively find the root and multiply weights along the path.
+        # After compression, x points directly to root with cumulative weight.
         if uf[x][0] != x:
             parent, weight = find(uf[x][0])
             uf[x] = (parent, uf[x][1] * weight)
@@ -762,9 +856,12 @@ def calcEquation(
     def union(x, y, value):
         px, wx = find(x)
         py, wy = find(y)
+        # Only merge if in different sets. If already in the same set,
+        # the ratio x/y is already determined by existing edges.
         if px != py:
-            # px to py: wx * w = value * wy
-            # w = value * wy / wx
+            # We want x/y = value. After find: x/px = wx, y/py = wy.
+            # We need px/py = w such that: wx * w = value * wy
+            # Solving: w = value * wy / wx
             uf[px] = (py, value * wy / wx)
 
     # Build union-find

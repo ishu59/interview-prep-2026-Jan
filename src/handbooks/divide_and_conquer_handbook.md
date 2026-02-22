@@ -55,8 +55,15 @@ Divide and Conquer reduces this by **splitting, solving independently, and combi
 ```python
 # O(n log n) - Divide, solve halves, combine
 def solve(arr, lo, hi):
+    # Why >= and not just ==? A single element (lo == hi) is already
+    # sorted/solved, and lo > hi means an empty range (no work to do).
+    # Both are base cases that need no further division.
     if lo >= hi:
         return base_case
+    # Why not (lo + hi) // 2? If lo and hi are both large,
+    # lo + hi can overflow in languages like Java/C++.
+    # lo + (hi - lo) // 2 avoids this by never exceeding hi.
+    # In Python, integers don't overflow, but this is a good habit.
     mid = (lo + hi) // 2
     left_result = solve(arr, lo, mid)
     right_result = solve(arr, mid + 1, hi)
@@ -149,6 +156,8 @@ def merge_sort_template(arr: list[int]) -> list[int]:
     Classic merge sort: divide in half, sort halves, merge.
     T(n) = 2T(n/2) + O(n) = O(n log n)
     """
+    # Why <= 1? An array of 0 or 1 elements is already sorted.
+    # This is the base case that stops recursion.
     if len(arr) <= 1:
         return arr
 
@@ -163,7 +172,12 @@ def merge(left: list[int], right: list[int]) -> list[int]:
     result = []
     i = j = 0
 
+    # Why both conditions with `and`? We can only compare when both
+    # halves still have elements. Once one is exhausted, we drain the other.
     while i < len(left) and j < len(right):
+        # Why `<=` and not `<`? Using <= makes the sort STABLE:
+        # when left[i] == right[j], we take from the LEFT side first,
+        # preserving the original relative order of equal elements.
         if left[i] <= right[j]:
             result.append(left[i])
             i += 1
@@ -171,6 +185,10 @@ def merge(left: list[int], right: list[int]) -> list[int]:
             result.append(right[j])
             j += 1
 
+    # Why extend with remaining elements? When the while loop ends,
+    # one half is exhausted but the other may still have elements.
+    # Those remaining elements are already sorted and all greater than
+    # everything placed so far, so we append them directly.
     result.extend(left[i:])
     result.extend(right[j:])
     return result
@@ -193,6 +211,7 @@ def quick_select_template(arr: list[int], k: int) -> int:
     Average T(n) = T(n/2) + O(n) = O(n).
     Worst case O(n^2) but random pivot makes it unlikely.
     """
+    # Why == 1? Only one element left -- it must be the answer.
     if len(arr) == 1:
         return arr[0]
 
@@ -202,10 +221,16 @@ def quick_select_template(arr: list[int], k: int) -> int:
     highs = [x for x in arr if x > pivot]
     pivots = [x for x in arr if x == pivot]
 
+    # Why k < len(lows)? The kth smallest (0-indexed) falls among
+    # elements strictly less than the pivot, so recurse only there.
     if k < len(lows):
         return quick_select_template(lows, k)
+    # Why k < len(lows) + len(pivots)? k falls in the pivot group.
+    # All pivots have the same value, so the answer is the pivot itself.
     elif k < len(lows) + len(pivots):
         return pivot
+    # Otherwise, k is in the highs group. Subtract lows and pivots
+    # counts to get k's position relative to the highs subarray.
     else:
         return quick_select_template(highs, k - len(lows) - len(pivots))
 ```
@@ -231,6 +256,9 @@ def tree_build_template(arr: list[int], lo: int, hi: int) -> TreeNode:
     Pick middle as root, recurse on left and right halves.
     T(n) = 2T(n/2) + O(1) = O(n)
     """
+    # Why lo > hi (not >=)? When lo == hi, there is exactly one element
+    # to place as a leaf node. Only when lo > hi is the range truly empty,
+    # meaning no node should be created (return None).
     if lo > hi:
         return None
 
@@ -257,10 +285,16 @@ def generic_dc_template(problem, lo: int, hi: int):
     Used for expression evaluation, matrix search, etc.
     """
     # Base case
+    # Why == and not >=? In the generic template, lo == hi means we have
+    # a single indivisible unit (e.g., one number or one operand).
+    # lo should never exceed hi if called correctly.
     if lo == hi:
         return base_solution(problem, lo)
 
     results = []
+    # Why range(lo, hi) and not range(lo, hi+1)? Each split point
+    # divides into [lo..split] and [split+1..hi]. If split == hi,
+    # the right side would be empty. So we stop at hi-1.
     for split in range(lo, hi):
         left_results = generic_dc_template(problem, lo, split)
         right_results = generic_dc_template(problem, split + 1, hi)
@@ -365,6 +399,7 @@ Output: [1, 2, 3, 5]
 **Python Solution:**
 ```python
 def sortArray(nums: list[int]) -> list[int]:
+    # Base case: 0 or 1 elements are already sorted.
     if len(nums) <= 1:
         return nums
 
@@ -375,13 +410,17 @@ def sortArray(nums: list[int]) -> list[int]:
     # Merge two sorted halves
     result = []
     i = j = 0
+    # Continue while both halves have unprocessed elements.
     while i < len(left) and j < len(right):
+        # Why <=? Preserves stability -- equal elements from the left
+        # half (which appeared first in the original array) are placed first.
         if left[i] <= right[j]:
             result.append(left[i])
             i += 1
         else:
             result.append(right[j])
             j += 1
+    # Drain whichever half has remaining elements (already sorted).
     result.extend(left[i:])
     result.extend(right[j:])
     return result
@@ -441,11 +480,21 @@ def reversePairs(nums: list[int]) -> int:
         left = merge_sort(arr[:mid])
         right = merge_sort(arr[mid:])
 
-        # Count reverse pairs across left and right
+        # Count reverse pairs across left and right.
+        # Both halves are sorted, so we use two pointers.
         j = 0
         for i in range(len(left)):
+            # Why `left[i] > 2 * right[j]`? This is the reverse pair
+            # condition. Because left is sorted, once left[i] > 2*right[j],
+            # all later left elements (i+1, i+2, ...) also satisfy it.
+            # And because right is sorted, j only moves forward --
+            # we never re-check earlier right elements.
             while j < len(right) and left[i] > 2 * right[j]:
                 j += 1
+            # j is the count of right elements that form reverse pairs
+            # with left[i]. Because j never resets (left is sorted,
+            # so left[i+1] >= left[i] still beats all those right[j]s),
+            # the total counting across all i is O(n).
             count[0] += j
 
         # Standard merge
@@ -534,24 +583,34 @@ def countSmaller(nums: list[int]) -> list[int]:
         right_count = 0  # How many from right have been placed
 
         while i < len(left) and j < len(right):
+            # Why compare [1] (the value) and not [0] (the index)?
+            # We sort by value to determine ordering, but track original
+            # indices to know WHERE to store each count.
+            # Why <=? When values are equal, taking from the left side
+            # first avoids counting equal elements as "smaller."
             if left[i][1] <= right[j][1]:
-                # left[i] is placed; all right elements placed so far are smaller
+                # left[i] is placed; all right elements placed so far
+                # (right_count of them) came from the right half and
+                # have smaller values -- they are "smaller numbers after self."
                 counts[left[i][0]] += right_count
                 merged.append(left[i])
                 i += 1
             else:
-                # right[j] is smaller, place it
+                # right[j] is smaller than left[i], so it contributes
+                # to the count for every left element still unplaced.
                 right_count += 1
                 merged.append(right[j])
                 j += 1
 
-        # Remaining left elements
+        # Remaining left elements: each one has right_count smaller
+        # elements from the right half placed before it.
         while i < len(left):
             counts[left[i][0]] += right_count
             merged.append(left[i])
             i += 1
 
-        # Remaining right elements
+        # Remaining right elements: no left elements care about these
+        # (all left elements are already placed).
         while j < len(right):
             merged.append(right[j])
             j += 1

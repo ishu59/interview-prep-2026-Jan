@@ -126,22 +126,38 @@ class Trie:
         node = self.root
         for char in word:
             index = self._char_to_index(char)
+            # If no child exists for this character, create one.
+            # This is insertion: we build the path that does not yet exist.
             if not node.children[index]:
                 node.children[index] = TrieNode()
             node = node.children[index]
+        # Why set is_end here? Because "app" is a prefix of "apple",
+        # but we need to know "app" is also a complete word on its own.
+        # Without this flag, search("app") could not distinguish
+        # "app was inserted" from "app is just a prefix of apple".
         node.is_end = True
 
     def search(self, word: str) -> bool:
         node = self._find_node(word)
+        # Two conditions must both be true:
+        # - `node is not None`: the full path for the word exists in the trie
+        # - `node.is_end`: someone actually inserted this exact word,
+        #   not just a longer word that shares this prefix
         return node is not None and node.is_end
 
     def startsWith(self, prefix: str) -> bool:
+        # Unlike search, we do NOT check is_end here.
+        # A prefix just needs the path to exist -- it does not need to
+        # be a complete word. So `is not None` alone is sufficient.
         return self._find_node(prefix) is not None
 
     def _find_node(self, prefix: str) -> TrieNode:
         node = self.root
         for char in prefix:
             index = self._char_to_index(char)
+            # If the child slot is empty (None), the trie has no path
+            # for this character at this position -- the prefix does
+            # not exist, so return None immediately.
             if not node.children[index]:
                 return None
             node = node.children[index]
@@ -166,22 +182,32 @@ class Trie:
     def insert(self, word: str) -> None:
         node = self.root
         for char in word:
+            # If this character has no child node yet, create one.
+            # Unlike an array-based trie, the dict starts empty,
+            # so we only allocate nodes for characters that actually appear.
             if char not in node.children:
                 node.children[char] = TrieNode()
             node = node.children[char]
+        # Mark this node as a complete word (see Template A for why).
         node.is_end = True
+        # Storing the full word here lets us retrieve it directly
+        # during DFS without rebuilding it character by character.
         node.word = word  # Optional
 
     def search(self, word: str) -> bool:
         node = self._find_node(word)
+        # Must check both: path exists AND it marks a complete word.
         return node is not None and node.is_end
 
     def startsWith(self, prefix: str) -> bool:
+        # Only need the path to exist -- no is_end check needed.
         return self._find_node(prefix) is not None
 
     def _find_node(self, prefix: str) -> TrieNode:
         node = self.root
         for char in prefix:
+            # If the character is missing from children, the trie
+            # has no continuation for this prefix -- return None.
             if char not in node.children:
                 return None
             node = node.children[char]
@@ -209,23 +235,38 @@ class TrieWithCount:
             if char not in node.children:
                 node.children[char] = TrieNode()
             node = node.children[char]
+            # Increment prefix_count at every node along the path,
+            # because every node on this path is a prefix of the word
+            # being inserted (e.g., inserting "apple" increments counts
+            # at nodes for "a", "ap", "app", "appl", "apple").
             node.prefix_count += 1
+        # Only increment count at the final node -- this tracks how
+        # many times this exact word (not just prefix) was inserted.
         node.count += 1
 
     def countWordsEqualTo(self, word: str) -> int:
         node = self._find_node(word)
+        # If node is None, the word was never inserted; return 0.
+        # Otherwise return count (exact word matches, not prefix matches).
         return node.count if node else 0
 
     def countWordsStartingWith(self, prefix: str) -> int:
         node = self._find_node(prefix)
+        # If node is None, no word with this prefix exists; return 0.
+        # Otherwise prefix_count tells us how many inserted words
+        # pass through this node (i.e., have this prefix).
         return node.prefix_count if node else 0
 
     def erase(self, word: str) -> None:
         node = self.root
         for char in word:
+            # If the path does not exist, the word was never inserted,
+            # so there is nothing to erase -- return early.
             if char not in node.children:
                 return
             node = node.children[char]
+            # Decrement prefix_count at each node along the path,
+            # reversing what insert did.
             node.prefix_count -= 1
         node.count -= 1
 
@@ -263,17 +304,29 @@ class WildcardTrie:
     def search(self, word: str) -> bool:
         """Search with '.' as wildcard matching any character."""
         def dfs(node, index):
+            # Base case: we have matched every character in the word.
+            # Now check is_end: did a complete word end at this node?
+            # Just reaching the node is not enough (e.g., path "app"
+            # exists because of "apple", but "app" is only a word if
+            # is_end is True).
             if index == len(word):
                 return node.is_end
 
             char = word[index]
+            # Why check `char == '.'`?
+            # '.' is a wildcard that can match ANY single character.
+            # We cannot just follow one path -- we must try every
+            # child because any character could be the match. If ANY
+            # child path leads to a successful match, we return True.
             if char == '.':
-                # Try all children
                 for child in node.children.values():
                     if dfs(child, index + 1):
                         return True
+                # None of the children led to a match.
                 return False
             else:
+                # For a regular character, the path must exist.
+                # If it does not, the word cannot be in the trie.
                 if char not in node.children:
                     return False
                 return dfs(node.children[char], index + 1)
@@ -294,6 +347,10 @@ class BitTrie:
 
     def insert(self, num: int) -> None:
         node = self.root
+        # Why iterate from MSB (most significant bit) to LSB?
+        # XOR maximization is greedy: a 1 in a higher bit position
+        # contributes more than all lower bits combined. So we must
+        # store and compare from the top bit downward.
         for i in range(self.max_bits - 1, -1, -1):
             bit = (num >> i) & 1
             if bit not in node:
@@ -306,14 +363,21 @@ class BitTrie:
         result = 0
         for i in range(self.max_bits - 1, -1, -1):
             bit = (num >> i) & 1
-            # Try to go opposite direction for max XOR
+            # To maximize XOR, we want the opposite bit at each position.
+            # XOR gives 1 when bits differ, so picking the opposite bit
+            # sets this bit position to 1 in the result.
             want = 1 - bit
             if want in node:
+                # The opposite bit exists -- this bit position contributes
+                # to the XOR result, so set it in the output.
                 result |= (1 << i)
                 node = node[want]
             elif bit in node:
+                # The opposite bit does not exist; we must follow the same
+                # bit (XOR is 0 at this position -- no contribution).
                 node = node[bit]
             else:
+                # No path exists at all (empty trie branch) -- stop early.
                 break
         return result
 ```
@@ -390,17 +454,27 @@ class Trie:
     def insert(self, word: str) -> None:
         node = self.root
         for char in word:
+            # Create the child node only if it does not exist yet.
+            # If it already exists (from a previously inserted word
+            # sharing the same prefix), just follow the existing path.
             if char not in node.children:
                 node.children[char] = TrieNode()
             node = node.children[char]
+        # Mark the end of a complete word. Without this, we could not
+        # tell "app" (inserted) from "app" (just a prefix of "apple").
         node.is_end = True
 
     def search(self, word: str) -> bool:
         node = self.root
         for char in word:
+            # If the character is missing, the word was never inserted.
+            # This is the key difference from insert: insert creates
+            # the missing node, search returns False.
             if char not in node.children:
                 return False
             node = node.children[char]
+        # We reached the end of the word path. Return is_end, NOT True,
+        # because the path might exist only as a prefix of a longer word.
         return node.is_end
 
     def startsWith(self, prefix: str) -> bool:
@@ -409,6 +483,8 @@ class Trie:
             if char not in node.children:
                 return False
             node = node.children[char]
+        # Return True (not is_end) because any existing path counts
+        # as a valid prefix, whether or not a complete word ends here.
         return True
 ```
 
@@ -429,20 +505,28 @@ class WordDictionary:
             if char not in node:
                 node[char] = {}
             node = node[char]
-        node['$'] = True  # End marker
+        # '$' is the end-of-word sentinel. Using a special key avoids
+        # needing a separate TrieNode class -- just nested dicts.
+        node['$'] = True
 
     def search(self, word: str) -> bool:
         def dfs(node, i):
+            # Base case: all characters matched. Check if a complete
+            # word ends here by looking for the '$' sentinel.
             if i == len(word):
                 return '$' in node
 
             char = word[i]
             if char == '.':
+                # '.' matches any character, so we must try EVERY child.
+                # We skip '$' because it is not a real character -- it is
+                # the end-of-word marker and cannot match '.'.
                 for key in node:
                     if key != '$' and dfs(node[key], i + 1):
                         return True
                 return False
             else:
+                # Exact character match: the path must exist.
                 if char not in node:
                     return False
                 return dfs(node[char], i + 1)
@@ -464,7 +548,11 @@ class WordDictionary:
 class TrieNode:
     def __init__(self):
         self.children = {}
-        self.word = None  # Store complete word at end
+        # Why store the whole word instead of just is_end?
+        # When DFS finds a match deep in the grid, we need to know
+        # WHICH word was found. Storing the word here avoids having
+        # to reconstruct it by tracking the path of characters.
+        self.word = None
 
 def findWords(board: list[list[str]], words: list[str]) -> list[str]:
     # Build Trie
@@ -482,32 +570,47 @@ def findWords(board: list[list[str]], words: list[str]) -> list[str]:
 
     def dfs(r, c, node):
         char = board[r][c]
+        # If the current cell's character has no matching child in the
+        # trie, no dictionary word can be formed along this path.
+        # Pruning here avoids exploring dead-end paths entirely.
         if char not in node.children:
             return
 
         next_node = node.children[char]
 
-        # Found a word
+        # Why check `next_node.word` (not just `next_node.is_end`)?
+        # We stored the full word string here, so a non-None value
+        # means a complete dictionary word ends at this trie node.
         if next_node.word:
             result.append(next_node.word)
-            next_node.word = None  # Avoid duplicates
+            # Set to None so the same word is not collected again if
+            # the same path is reached from a different starting cell.
+            next_node.word = None
 
-        # Mark visited
+        # Mark visited by replacing with '#'. This prevents the DFS
+        # from revisiting this cell in the current path (no cycles).
         board[r][c] = '#'
 
-        # Explore neighbors
+        # Explore all 4 neighbors
         for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
             nr, nc = r + dr, c + dc
+            # Bounds check AND visited check (board[nr][nc] != '#')
+            # combined in one condition for efficiency.
             if 0 <= nr < rows and 0 <= nc < cols and board[nr][nc] != '#':
                 dfs(nr, nc, next_node)
 
-        # Restore
+        # Restore the original character (backtracking) so other
+        # starting cells can use this cell in their paths.
         board[r][c] = char
 
-        # Optimization: prune empty branches
+        # Optimization: if next_node has no remaining children, it
+        # cannot lead to any more undiscovered words. Remove it from
+        # the trie so future DFS calls skip this branch entirely.
         if not next_node.children:
             del node.children[char]
 
+    # Start DFS from every cell -- any cell could be the first letter
+    # of a dictionary word.
     for i in range(rows):
         for j in range(cols):
             dfs(i, j, root)
@@ -527,12 +630,15 @@ def findWords(board: list[list[str]], words: list[str]) -> list[str]:
 
 ```python
 def longestCommonPrefix(strs: list[str]) -> str:
+    # Edge case: no strings means no common prefix.
     if not strs:
         return ""
 
     # Build Trie
     root = {}
     for word in strs:
+        # If any word is empty, the common prefix is empty --
+        # every word must share the prefix, and "" has nothing.
         if not word:
             return ""
         node = root
@@ -542,10 +648,16 @@ def longestCommonPrefix(strs: list[str]) -> str:
             node = node[char]
         node['$'] = True
 
-    # Find LCP: follow path while single child and not end
+    # Find LCP: follow the trie path while it does not branch.
     prefix = []
     node = root
     while True:
+        # Stop if:
+        # - '$' in node: a word ends here, so a shorter word exists
+        #   and the common prefix cannot extend further.
+        # - len(node) != 1: the path branches into multiple characters,
+        #   meaning the strings diverge at this position.
+        # Both conditions mean the common prefix has ended.
         if '$' in node or len(node) != 1:
             break
         char = next(iter(node.keys()))
@@ -563,8 +675,13 @@ def longestCommonPrefix_simple(strs: list[str]) -> str:
 
     prefix = strs[0]
     for s in strs[1:]:
+        # Shrink the prefix until it matches the start of s.
+        # Why `while` and not `if`? Because we may need to chop off
+        # more than one character -- e.g., prefix="flower" and
+        # s="flight" requires shrinking to "fl".
         while not s.startswith(prefix):
             prefix = prefix[:-1]
+            # If the prefix is empty, no common prefix exists at all.
             if not prefix:
                 return ""
 
@@ -594,7 +711,9 @@ def suggestedProducts(products: list[str], searchWord: str) -> list[list[str]]:
             if char not in node.children:
                 node.children[char] = TrieNode()
             node = node.children[char]
-            # Store only first 3 suggestions
+            # Why `< 3`? The problem asks for at most 3 suggestions.
+            # Because products are pre-sorted, the first 3 that pass
+            # through this node are already the lexicographically smallest.
             if len(node.suggestions) < 3:
                 node.suggestions.append(product)
 
@@ -602,10 +721,16 @@ def suggestedProducts(products: list[str], searchWord: str) -> list[list[str]]:
     result = []
     node = root
     for char in searchWord:
+        # Why check `node` first? Once we fall off the trie (node
+        # becomes None), no further characters can have suggestions.
+        # Why check `char in node.children`? The typed prefix may not
+        # match any product beyond this point.
         if node and char in node.children:
             node = node.children[char]
             result.append(node.suggestions)
         else:
+            # Once we leave the trie, every subsequent character also
+            # has no suggestions, so set node = None to short-circuit.
             node = None
             result.append([])
 
@@ -633,11 +758,18 @@ def replaceWords(dictionary: list[str], sentence: str) -> str:
     def find_root(word):
         node = root
         for char in word:
+            # If the character is missing from the trie, no dictionary
+            # root is a prefix of this word -- return the word unchanged.
             if char not in node:
-                return word  # No root found
+                return word
             node = node[char]
+            # Why check '$' at every step (not just at the end)?
+            # We want the SHORTEST root. The first time we hit a '$'
+            # marker, we have found the shortest dictionary root that
+            # is a prefix of this word. Returning immediately ensures
+            # "cat" is preferred over "cattle" as a root for "cattle".
             if '$' in node:
-                return node['$']  # Found shortest root
+                return node['$']
         return word
 
     words = sentence.split()
@@ -680,9 +812,12 @@ class AutocompleteSystem:
         sentences = []
 
         def dfs(n):
+            # If this node has a '$' key, a complete sentence ends here.
             if '$' in n:
                 sentences.append(n['$'])
             for char in n:
+                # Skip '$' -- it is the end-of-word sentinel, not a
+                # child to recurse into.
                 if char != '$':
                     dfs(n[char])
 
@@ -690,8 +825,9 @@ class AutocompleteSystem:
         return sentences
 
     def input(self, c: str) -> list[str]:
+        # '#' signals the user finished typing a sentence.
+        # We save it, insert it into the trie, and reset state.
         if c == '#':
-            # End of sentence
             sentence = ''.join(self.current_input)
             self.counts[sentence] += 1
             self._insert(sentence)
@@ -701,9 +837,14 @@ class AutocompleteSystem:
 
         self.current_input.append(c)
 
+        # If current_node is None, a previous character already fell
+        # off the trie. No prefix match is possible anymore.
         if self.current_node is None:
             return []
 
+        # If the new character has no child in the trie, the current
+        # prefix does not match any stored sentence. Set node to None
+        # so all future characters in this sentence also return [].
         if c not in self.current_node:
             self.current_node = None
             return []
@@ -713,7 +854,9 @@ class AutocompleteSystem:
         # Get all sentences with current prefix
         sentences = self._get_all_sentences(self.current_node)
 
-        # Sort by frequency (desc) then lexicographically
+        # Sort by frequency (desc) then lexicographically.
+        # Negative count gives descending frequency; 'x' gives
+        # ascending alphabetical order as tiebreaker.
         sentences.sort(key=lambda x: (-self.counts[x], x))
 
         return sentences[:3]

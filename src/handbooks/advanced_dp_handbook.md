@@ -83,18 +83,30 @@ def bitmask_dp(n: int, items: list, constraint) -> int:
     dp[0] = base_value
 
     for mask in range(1 << n):
+        # Why `dp[mask] == float('inf'): continue`?
+        # If dp[mask] is still infinity, this subset was never reached via any valid
+        # transition — it's an unreachable state, so skip it to avoid propagating garbage.
         if dp[mask] == float('inf'):
             continue
 
         for i in range(n):
+            # Why `mask & (1 << i)`?
+            # Check if bit i is set in the mask, meaning item i has already been used.
+            # Binary example: mask=0b1010, i=1 → 1010 & 0010 = 0010 (truthy) → item 1 is used.
             if mask & (1 << i):  # i already used
                 continue
 
             # Can we add item i?
             if can_add(mask, i, constraint):
+                # Why `mask | (1 << i)`?
+                # Set bit i to 1, adding item i to the subset.
+                # Binary example: mask=0b1010, i=0 → 1010 | 0001 = 1011 → item 0 now included.
                 new_mask = mask | (1 << i)
                 dp[new_mask] = min(dp[new_mask], dp[mask] + cost(i))
 
+    # Why `(1 << n) - 1`?
+    # This creates a bitmask with all n bits set to 1, meaning "all items selected."
+    # Binary example: n=4 → (1<<4)-1 = 16-1 = 15 = 0b1111 → all 4 items included.
     return dp[(1 << n) - 1]
 ```
 
@@ -112,6 +124,10 @@ def assignment_dp(n: int, cost: list[list[int]]) -> int:
     dp[0] = 0
 
     for mask in range(1 << n):
+        # Why `bin(mask).count('1')` gives the worker index?
+        # We assign workers in order: worker 0 first, then worker 1, etc.
+        # The number of 1-bits (jobs assigned so far) tells us which worker is next.
+        # Example: mask=0b0101 → two 1s → workers 0,1 assigned → worker 2 is next.
         worker = bin(mask).count('1')  # Which worker we're assigning
         if worker >= n:
             continue
@@ -212,12 +228,24 @@ def digit_dp(num: str) -> int:
     @lru_cache(maxsize=None)
     def dp(pos: int, tight: bool, state) -> int:
         if pos == n:
+            # Why `is_valid(state)` at base case?
+            # We've placed all digits and built a complete number. Now check if it
+            # satisfies the property we're counting (e.g., all unique digits, sum constraint).
             return is_valid(state)
 
+        # Why `int(num[pos]) if tight else 9`?
+        # "tight" means we've matched the upper bound exactly so far.
+        # If tight, we can only go up to the actual digit at this position.
+        # Example: counting up to 347, at pos 0: if tight, limit=3 (digits 0-3);
+        # if not tight (we already placed a smaller digit earlier), limit=9 (digits 0-9).
         limit = int(num[pos]) if tight else 9
         result = 0
 
         for digit in range(0, limit + 1):
+            # Why `tight and (digit == limit)`?
+            # Tight propagation: the next position stays tight ONLY if we're still
+            # exactly matching the upper bound — i.e., we were tight AND chose the
+            # maximum allowed digit. If we chose anything smaller, we're "free" forever.
             new_tight = tight and (digit == limit)
             new_state = update_state(state, digit)
             result += dp(pos + 1, new_tight, new_state)
@@ -264,6 +292,9 @@ def dp_monotonic_deque(nums: list[int], k: int) -> list[int]:
 
     for i in range(n):
         # Remove elements outside window
+        # Why `dq[0] < i - k`?
+        # The front index fell out of the sliding window [i-k, i-1].
+        # We can only extend from the last k elements, so expired indices must go.
         while dq and dq[0] < i - k:
             dq.popleft()
 
@@ -274,6 +305,10 @@ def dp_monotonic_deque(nums: list[int], k: int) -> list[int]:
             dp[i] = nums[i]
 
         # Maintain decreasing order
+        # Why `dp[dq[-1]] <= dp[i]`?
+        # We maintain a decreasing invariant: the front always holds the best (max) value.
+        # Any index at the back with a worse (<=) dp value than the current can never win —
+        # the current index is both newer (stays in window longer) AND better, so remove them.
         while dq and dp[dq[-1]] <= dp[i]:
             dq.pop()
         dq.append(i)
@@ -349,12 +384,19 @@ def tsp(dist: list[list[int]]) -> int:
 
     # dp[mask][i] = min cost to reach city i with visited cities = mask
     dp = [[INF] * n for _ in range(1 << n)]
+    # Why `dp[1][0] = 0`?
+    # Start at city 0 with only city 0 visited. mask=1 means 0b0001 — only bit 0 is set.
+    # Cost to be at city 0 having visited only city 0 is 0 (no travel yet).
     dp[1][0] = 0  # Start at city 0
 
     for mask in range(1 << n):
         for last in range(n):
             if dp[mask][last] == INF:
                 continue
+            # Why `not (mask & (1 << last))`?
+            # Skip if city `last` is NOT actually in the visited set.
+            # We're iterating all (mask, last) pairs, but only valid states have `last` in the mask.
+            # Binary example: mask=0b1010, last=0 → 1010 & 0001 = 0 → city 0 not visited, skip.
             if not (mask & (1 << last)):
                 continue
 
@@ -369,6 +411,9 @@ def tsp(dist: list[list[int]]) -> int:
                 )
 
     # Return to city 0
+    # Why `(1 << n) - 1`?
+    # All cities visited: n bits all set to 1.
+    # Binary example: n=4 → (1<<4)-1 = 0b1111 → cities 0,1,2,3 all visited.
     full_mask = (1 << n) - 1
     return min(dp[full_mask][i] + dist[i][0] for i in range(n))
 ```
@@ -386,11 +431,18 @@ def minimumXORSum(nums1: list[int], nums2: list[int]) -> int:
     dp[0] = 0
 
     for mask in range(1 << n):
+        # Why `bin(mask).count('1')` tells us which element of nums1 to pair next?
+        # We pair nums1 elements in order (0, 1, 2, ...). The mask tracks which nums2
+        # elements are already paired. The number of 1-bits = number of pairings done
+        # = index of the next nums1 element. Example: mask=0b101 → 2 bits set → nums1[2] is next.
         i = bin(mask).count('1')  # How many from nums1 we've paired
         if i >= n:
             continue
 
         for j in range(n):
+            # Why `mask & (1 << j): continue`?
+            # Skip if nums2[j] is already paired with a previous nums1 element.
+            # Binary example: mask=0b101, j=2 → 101 & 100 = 100 (truthy) → nums2[2] already used.
             if mask & (1 << j):
                 continue
             new_mask = mask | (1 << j)
@@ -423,6 +475,11 @@ def minNumberOfSemesters(n: int, relations: list, k: int) -> int:
         # Find available courses (prerequisites satisfied)
         available = 0
         for i in range(n):
+            # Why `(prereq[i] & mask) == prereq[i]`?
+            # ALL prerequisites of course i must be completed (in the mask).
+            # ANDing prereq[i] with mask keeps only the completed prereqs.
+            # If the result equals prereq[i], then every prerequisite bit is satisfied.
+            # Example: prereq[i]=0b0110, mask=0b1110 → 0110 & 1110 = 0110 == 0110 ✓ all done.
             if not (mask & (1 << i)) and (prereq[i] & mask) == prereq[i]:
                 available |= (1 << i)
 
@@ -432,6 +489,10 @@ def minNumberOfSemesters(n: int, relations: list, k: int) -> int:
             if bin(subset).count('1') <= k:
                 new_mask = mask | subset
                 dp[new_mask] = min(dp[new_mask], dp[mask] + 1)
+            # Why `(subset - 1) & available`?
+            # Standard bitmask subset enumeration trick: iterates through ALL subsets of
+            # `available` in decreasing order. Subtracting 1 flips the lowest set bit and
+            # bits below it; ANDing with `available` keeps only valid bits. Terminates at 0.
             subset = (subset - 1) & available
 
     return dp[(1 << n) - 1]
@@ -448,6 +509,9 @@ from collections import deque
 
 def shortestPathLength(graph: list[list[int]]) -> int:
     n = len(graph)
+    # Why `(1 << n) - 1`?
+    # All n nodes visited: a bitmask with all n bits set to 1.
+    # Binary example: n=4 → (1<<4)-1 = 0b1111 → nodes 0,1,2,3 all visited.
     target = (1 << n) - 1
 
     # BFS: state = (mask, current_node)
@@ -462,10 +526,15 @@ def shortestPathLength(graph: list[list[int]]) -> int:
     while queue:
         (mask, node), dist = queue.popleft()
 
+        # Why `mask == target`?
+        # All bits are set — every node has been visited. We found the shortest path.
         if mask == target:
             return dist
 
         for neighbor in graph[node]:
+            # Why `mask | (1 << neighbor)`?
+            # Mark neighbor as visited by setting its bit.
+            # Binary example: mask=0b1001, neighbor=1 → 1001 | 0010 = 1011 → node 1 now visited.
             new_mask = mask | (1 << neighbor)
             state = (new_mask, neighbor)
 
@@ -496,13 +565,22 @@ def maxPathSum(root: TreeNode) -> int:
         if not node:
             return 0
 
+        # Why `max(dfs(node.left), 0)`?
+        # If the child's best path sum is negative, it's better to NOT include it at all.
+        # This is the "optional extension" insight: you'd rather start fresh (contribute 0)
+        # than take a losing path that drags down the total.
         left = max(dfs(node.left), 0)
         right = max(dfs(node.right), 0)
 
-        # Path through current node
+        # Why `left + node.val + right` for the global update?
+        # This considers a path that passes THROUGH this node using BOTH children.
+        # This is the best "arch-shaped" path at this node — the global answer candidate.
         max_sum = max(max_sum, left + node.val + right)
 
-        # Return max path going down (can only choose one direction)
+        # Why `node.val + max(left, right)` for the RETURN value?
+        # When returning to the parent, we can only go UP through ONE side — a path
+        # can't fork. So we pick the better child. The global update above is the only
+        # place where both sides are combined.
         return node.val + max(left, right)
 
     dfs(root)
@@ -525,10 +603,14 @@ def rob(root: TreeNode) -> int:
         left = dfs(node.left)
         right = dfs(node.right)
 
-        # Rob this node: must skip children
+        # Why `node.val + left[1] + right[1]`?
+        # Rob this node → adjacent children CANNOT be robbed (house robber constraint).
+        # So we take each child's "skip" value (index [1]). We're forced into their skip path.
         rob_this = node.val + left[1] + right[1]
 
-        # Skip this node: can rob or skip children
+        # Why `max(left) + max(right)`?
+        # Skip this node → we're FREE to rob or skip each child independently.
+        # No adjacency constraint with grandchildren, so take the best of (rob, skip) for each.
         skip_this = max(left) + max(right)
 
         return (rob_this, skip_this)
@@ -603,9 +685,11 @@ def sumOfDistancesInTree(n: int, edges: list[list[int]]) -> list[int]:
     def dfs2(node: int, parent: int):
         for child in adj[node]:
             if child != parent:
-                # Moving root from node to child:
-                # - child's subtree gets 1 closer (count[child] nodes)
-                # - rest gets 1 farther (n - count[child] nodes)
+                # Why `ans[node] - count[child] + (n - count[child])`?
+                # THE KEY REROOTING FORMULA: when we move the root from `node` to `child`:
+                #   - child's subtree has count[child] nodes, each gets 1 CLOSER → subtract count[child]
+                #   - the rest of the tree has (n - count[child]) nodes, each gets 1 FARTHER → add (n - count[child])
+                # Net change = -count[child] + (n - count[child]) = n - 2*count[child]
                 ans[child] = ans[node] - count[child] + (n - count[child])
                 dfs2(child, node)
 
@@ -688,15 +772,25 @@ def countSpecialNumbers(n: int) -> int:
     @lru_cache(maxsize=None)
     def dp(pos: int, mask: int, tight: bool, started: bool) -> int:
         if pos == length:
+            # Why `1 if started else 0`?
+            # Only count this number if we actually placed at least one non-zero digit.
+            # A number like "000" (started=False) is just 0, not a valid "special integer."
             return 1 if started else 0
 
         limit = int(s[pos]) if tight else 9
         result = 0
 
         for digit in range(0, limit + 1):
+            # Why `not started and digit == 0`?
+            # Handle leading zeros: placing a 0 before any non-zero digit doesn't "start"
+            # the number. 007 is not a 3-digit number — it's just 7. Leading zeros don't
+            # consume a digit slot, so we don't update the mask.
             if not started and digit == 0:
                 # Haven't started, skip leading zero
                 result += dp(pos + 1, mask, False, False)
+            # Why `not (mask & (1 << digit))`?
+            # Check that this digit hasn't been used yet (all digits must be unique).
+            # Binary example: mask=0b0100, digit=2 → 0100 & 0100 = 0100 (truthy) → digit 2 already used, skip.
             elif not (mask & (1 << digit)):
                 # Digit not used yet
                 new_mask = mask | (1 << digit)
@@ -775,10 +869,19 @@ def knightProbability(n: int, k: int, row: int, column: int) -> float:
 
         for r in range(n):
             for c in range(n):
+                # Why `dp[r][c] > 0`?
+                # Skip cells with zero probability — the knight can't be here, so no
+                # transitions to compute. This is a pure optimization to avoid useless work.
                 if dp[r][c] > 0:
                     for dr, dc in moves:
                         nr, nc = r + dr, c + dc
+                        # Why `0 <= nr < n and 0 <= nc < n`?
+                        # The knight must stay on the board. If it jumps off, that
+                        # probability is simply lost (contributes to "fell off" outcomes).
                         if 0 <= nr < n and 0 <= nc < n:
+                            # Why `dp[r][c] / 8`?
+                            # A knight has exactly 8 possible moves, each equally likely.
+                            # So each destination gets 1/8 of the current cell's probability.
                             new_dp[nr][nc] += dp[r][c] / 8
 
         dp = new_dp
@@ -836,13 +939,25 @@ def new21Game(n: int, k: int, maxPts: int) -> float:
     result = 0.0
 
     for i in range(1, n + 1):
+        # Why `window_sum / maxPts`?
+        # Each of the maxPts cards (1, 2, ..., maxPts) is equally likely to be drawn.
+        # dp[i] is the sum of probabilities of all states that can reach i, divided by maxPts.
         dp[i] = window_sum / maxPts
 
+        # Why `i < k`?
+        # Still drawing: we haven't reached k points yet, so this state can lead to
+        # future draws. Add its probability to the window for computing future dp values.
         if i < k:
             window_sum += dp[i]
+        # Why `else` (i.e., i >= k)?
+        # Stopped drawing: we've reached k or more points, so this is a terminal state.
+        # Since i <= n, this is a winning terminal state — add to result.
         else:
             result += dp[i]
 
+        # Why `i >= maxPts`?
+        # Slide the window: dp[i - maxPts] can no longer contribute to future states
+        # because the max card value is maxPts. Remove its contribution from the window.
         if i >= maxPts:
             window_sum -= dp[i - maxPts]
 
@@ -875,6 +990,10 @@ def constrainedSubsetSum(nums: list[int], k: int) -> int:
         # dp[i] = nums[i] + max(0, dp[j]) for j in [i-k, i-1]
         dp[i] = nums[i]
         if dq:
+            # Why `max(0, dp[dq[0]])`?
+            # Optionally extend from the best previous element in the window.
+            # max with 0 means "start fresh" if all previous dp values are negative —
+            # it's better to begin a new subsequence here than extend a losing one.
             dp[i] += max(0, dp[dq[0]])
 
         # Maintain decreasing order
@@ -1156,5 +1275,39 @@ def dfs(node):
 2. Tree: 337 → 124 → 834
 3. Digit: 357 → 902 → 2376
 4. Optimization: 1696 → 1425
+
+---
+
+## Appendix: Conditional Quick Reference
+
+### Bitmask Operations Quick Reference
+
+| Operation | Code | Purpose | Binary Example (n=4) |
+|-----------|------|---------|----------------------|
+| Check if bit i is set | `mask & (1 << i)` | Is item i in the subset? | `mask=0b1010, i=1 → 1010 & 0010 = 0010` (truthy: item 1 is in set) |
+| Set bit i | `mask \| (1 << i)` | Add item i to the subset | `mask=0b1010, i=0 → 1010 \| 0001 = 1011` (item 0 added) |
+| All items selected | `(1 << n) - 1` | Bitmask with all n bits set | `n=4 → 10000 - 1 = 0b1111` (all 4 items) |
+| Popcount (count 1s) | `bin(mask).count('1')` | How many items are in the subset | `mask=0b1010 → 2 bits set → 2 items selected` |
+| Enumerate subsets of mask | `sub = mask; while sub: ...; sub = (sub-1) & mask` | Iterate all subsets of a bitmask | `mask=0b110 → subsets: 110, 100, 010` (then 0 terminates) |
+| Clear bit i | `mask & ~(1 << i)` | Remove item i from subset | `mask=0b1010, i=3 → 1010 & 0111 = 0010` (item 3 removed) |
+| Toggle bit i | `mask ^ (1 << i)` | Flip item i in/out of subset | `mask=0b1010, i=1 → 1010 ^ 0010 = 1000` (item 1 toggled off) |
+
+### Key DP Conditionals
+
+| Conditional | Pattern | Why It Works |
+|-------------|---------|-------------|
+| `int(num[pos]) if tight else 9` | Digit DP | **Tight constraint:** if still matching the upper bound exactly, we can only use digits up to the actual digit at this position. Once we go below, we're "free" to use 0-9. Example: for 347, at pos 0 tight means limit=3; not tight means limit=9. |
+| `tight and (digit == limit)` | Digit DP | **Tight propagation:** the next position stays tight ONLY if we chose the exact upper-bound digit. Choosing anything smaller means all future positions are unconstrained. |
+| `not started and digit == 0` | Digit DP | **Leading zeros:** a zero before any non-zero digit doesn't count as a placed digit. 007 is just 7, not a 3-digit number. Don't update the digit-tracking mask for leading zeros. |
+| `1 if started else 0` | Digit DP | **Base case validity:** only count the number if at least one non-zero digit was placed. |
+| `max(dfs(child), 0)` | Tree DP (Path Sum) | **Optional extension:** if a child's path sum is negative, don't include it. Starting fresh (0) is better than a losing path. |
+| `left + val + right` vs `val + max(left, right)` | Tree DP (Path Sum) | **Global vs return:** the global update uses BOTH children (path through node). The return value uses only ONE child (path can't fork going upward). |
+| `node.val + left[1] + right[1]` | Tree DP (House Robber) | **Rob this node:** must skip both children (adjacency constraint), so take their "skip" values `[1]`. |
+| `max(left) + max(right)` | Tree DP (House Robber) | **Skip this node:** free to rob or skip each child independently — take the better option for each. |
+| `ans[node] - count[child] + (n - count[child])` | Tree DP (Rerooting) | **Reroot formula:** moving root to child makes child's subtree (count[child] nodes) 1 closer and the rest (n - count[child] nodes) 1 farther. |
+| `dp[r][c] / 8` | Probability DP | **Uniform distribution:** knight has 8 equally likely moves, each gets 1/8 of current probability. |
+| `0 <= nr < n` | Probability DP | **Board bounds:** if knight jumps off board, that probability is lost (not added anywhere). |
+| `i < k` (add to window) vs `i >= k` (add to result) | Probability DP (21 Game) | **Drawing vs terminal:** below k points, still drawing (contribute to future states). At k+, stopped drawing (terminal state, count toward result). |
+| `max(0, dp[dq[0]])` | DP + Monotonic Deque | **Optional start:** extend from the best previous value, or start a new subsequence (0) if all previous values are negative. |
 
 Good luck with your interview preparation!

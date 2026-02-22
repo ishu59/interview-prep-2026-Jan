@@ -273,8 +273,12 @@ public int firstOccurrence(int[] nums, int target) {
             lo = mid + 1;  // mid is too small, go right
         }
     }
-    
+
     // Validate: Did we actually find the target?
+    // Why TWO checks? (1) lo < nums.length guards against searching
+    // past the array end (e.g., target larger than all elements).
+    // (2) nums[lo] == target confirms we found the target, not just
+    // the first element >= target (which could be a larger value).
     if (lo < nums.length && nums[lo] == target) {
         return lo;
     }
@@ -320,8 +324,11 @@ public int lastOccurrence(int[] nums, int target) {
             hi = mid - 1;  // mid is too large, go left
         }
     }
-    
+
     // Validate: Did we actually find the target?
+    // Why lo >= 0? If the array has no elements <= target, lo could
+    // still be 0 (the initial value), but we need to confirm it
+    // actually matches. The bounds check is defensive against edge cases.
     if (lo >= 0 && nums[lo] == target) {
         return lo;
     }
@@ -364,7 +371,10 @@ public int searchInsert(int[] nums, int target) {
         }
     }
     
-    // Special case: target larger than all elements
+    // Special case: target larger than all elements.
+    // Our loop converges to the last index, but if target exceeds
+    // nums[lo], the correct insert position is one past the end.
+    // Example: [1,3,5], target=6 -> lo=2, nums[2]=5 < 6, return 3.
     if (lo < nums.length && nums[lo] < target) {
         return lo + 1;
     }
@@ -388,12 +398,17 @@ Unlike exact match, insert position ALWAYS has an answer (even if at the end).
 
 ```java
 public int[] searchRange(int[] nums, int target) {
+    // Empty array has no elements to search -- return early.
     if (nums.length == 0) {
         return new int[]{-1, -1};
     }
-    
+
     // Find first occurrence (Template A)
     int first = firstOccurrence(nums, target);
+    // Why check first before searching for last?
+    // If the target doesn't exist at all, there's no point running
+    // a second binary search. This is both an optimization and
+    // a correctness guard.
     if (first == -1) {
         return new int[]{-1, -1};  // Target not found
     }
@@ -427,11 +442,20 @@ public int searchRotated(int[] nums, int target) {
     while (lo < hi) {
         int mid = lo + (hi - lo) / 2;
         
-        // Step 1: Determine which half is sorted
+        // Step 1: Determine which half is sorted.
+        // Why `<=` and not `<`?
+        // When lo == mid (only 2 elements left), nums[lo] == nums[mid]
+        // trivially. The left "half" is just one element, which IS
+        // sorted. Using `<` would wrongly treat it as unsorted.
         if (nums[lo] <= nums[mid]) {
             // LEFT half [lo...mid] is sorted
-            
+
             // Step 2: Is target in the sorted half?
+            // Why double-bound check `nums[lo] <= target && target <= nums[mid]`?
+            // Because the left half is sorted, we can reliably check
+            // if target falls within its range. This is the one half
+            // where a simple range test works. If target is outside
+            // this range, it MUST be in the other (possibly unsorted) half.
             if (nums[lo] <= target && target <= nums[mid]) {
                 hi = mid;  // Yes, search sorted left half
             } else {
@@ -439,8 +463,13 @@ public int searchRotated(int[] nums, int target) {
             }
         } else {
             // RIGHT half [mid+1...hi] is sorted
-            
+
             // Step 2: Is target in the sorted half?
+            // Why `nums[mid] < target` (strict) but `target <= nums[hi]`?
+            // We already know nums[mid] != target would have been handled
+            // if mid were the answer. Using `<` for mid excludes mid itself,
+            // while `<=` for hi includes the right boundary. Together they
+            // define the open-closed range (mid, hi] of the sorted right half.
             if (nums[mid] < target && target <= nums[hi]) {
                 lo = mid + 1;  // Yes, search sorted right half
             } else {
@@ -449,6 +478,9 @@ public int searchRotated(int[] nums, int target) {
         }
     }
     
+    // After convergence, lo == hi. Verify we actually found the target,
+    // since binary search only narrows to a candidate -- it does not
+    // guarantee the target exists in the array.
     return (nums[lo] == target) ? lo : -1;
 }
 ```
@@ -486,8 +518,14 @@ public boolean searchRotatedDuplicates(int[] nums, int target) {
     while (lo < hi) {
         int mid = lo + (hi - lo) / 2;
         
-        // Handle ambiguity: can't determine sorted half
-        // Must shrink linearly in this case
+        // Handle ambiguity: can't determine sorted half.
+        // When all three values are equal (e.g., [1,1,1,0,1]),
+        // there is no way to know which side the rotation point is on.
+        // Why shrink BOTH ends? Shrinking only one side could skip
+        // the rotation point on the other side. By trimming one
+        // element from each end, we safely reduce the window while
+        // guaranteeing we don't jump over the answer (it can't be
+        // at lo or hi since they equal mid, which we'll re-check).
         if (nums[lo] == nums[mid] && nums[mid] == nums[hi]) {
             lo++;
             hi--;
@@ -561,8 +599,11 @@ Can ship?  [❌  ❌  ❌  ✅  ✅  ✅  ✅  ...]
 ```java
 public int splitArray(int[] nums, int m) {
     // Bounds:
-    // lo = max element (can't split an element)
-    // hi = sum of all (one subarray)
+    // lo = max element (can't split an element) -- any valid capacity
+    //   must be at least as large as the biggest single element,
+    //   otherwise that element alone would exceed the limit.
+    // hi = sum of all (one subarray) -- putting everything in one
+    //   subarray is always feasible, so this is the upper bound.
     int lo = 0;
     int hi = 0;
     for (int num : nums) {
@@ -590,10 +631,16 @@ private boolean canSplit(int[] nums, int maxSum, int m) {
     int currentSum = 0;
     
     for (int num : nums) {
+        // Why `>` and not `>=`? A subarray sum exactly equal to
+        // maxSum is still valid. We only need a new subarray when
+        // adding this element would EXCEED the allowed maximum.
         if (currentSum + num > maxSum) {
             // Need new subarray
             subarrays++;
             currentSum = num;
+            // Why early return here? If we already need more than m
+            // subarrays and haven't finished iterating, there's no
+            // way to fit the remaining elements -- fail fast.
             if (subarrays > m) return false;  // Too many subarrays
         } else {
             currentSum += num;
@@ -653,11 +700,19 @@ private boolean canPlace(int[] position, int minDist, int m) {
     int count = 1;  // Place first ball at position[0]
     int lastPos = position[0];
     
+    // Why start at i = 1? We greedily placed the first ball at
+    // position[0] (the leftmost position after sorting), so we
+    // check remaining positions starting from the second one.
     for (int i = 1; i < position.length; i++) {
+        // Why `>=` and not `>`? The minimum distance constraint
+        // means balls must be AT LEAST minDist apart. Exactly
+        // minDist apart is valid, so we use >= (not strict >).
         if (position[i] - lastPos >= minDist) {
             // Can place another ball here
             count++;
             lastPos = position[i];
+            // Why `>=` here? We need exactly m balls. Once we've
+            // placed m, we're done -- no need to check further.
             if (count >= m) return true;  // Placed all balls!
         }
     }
@@ -682,16 +737,23 @@ Finding `sqrt(8)` = `2` (floor value)
 
 ```java
 public int mySqrt(int x) {
+    // Why x < 2? For x = 0, sqrt = 0. For x = 1, sqrt = 1.
+    // These are the only cases where sqrt(x) == x, and they'd
+    // cause issues with our hi = x/2 bound (x/2 = 0 for x = 1).
     if (x < 2) return x;
-    
+
     int lo = 1;
-    int hi = x / 2;  // sqrt(x) <= x/2 for x >= 4
+    // Why x/2? For any x >= 4, sqrt(x) <= x/2.
+    // Proof: (x/2)^2 = x^2/4 >= x when x >= 4.
+    // This tightens the search space vs using hi = x.
+    int hi = x / 2;
     
     while (lo < hi) {
         int mid = lo + (hi - lo + 1) / 2;  // Template B
         
-        // Avoid overflow: instead of mid*mid <= x
-        // Use: mid <= x/mid
+        // Avoid overflow: mid*mid can exceed Integer.MAX_VALUE,
+        // but mid <= x/mid is algebraically equivalent and safe.
+        // This checks: is mid^2 <= x? i.e., is mid a valid sqrt floor?
         if (mid <= x / mid) {
             lo = mid;  // mid^2 <= x, try larger
         } else {
@@ -735,8 +797,15 @@ public int minEatingSpeed(int[] piles, int h) {
 private boolean canFinish(int[] piles, int speed, int h) {
     long hours = 0;
     for (int pile : piles) {
-        hours += (pile + speed - 1) / speed;  // Ceiling division
+        // Why ceiling division `(pile + speed - 1) / speed`?
+        // Koko must spend a whole hour on each pile, even if she
+        // finishes early. A pile of 7 bananas at speed 3 takes
+        // ceil(7/3) = 3 hours, not 2. The formula avoids floating
+        // point: ceil(a/b) == (a + b - 1) / b for positive integers.
+        hours += (pile + speed - 1) / speed;
     }
+    // Why `<=` and not `==`? Koko can finish EARLY. If she can
+    // eat everything in fewer than h hours, that speed still works.
     return hours <= h;
 }
 ```
@@ -764,7 +833,12 @@ public int kthSmallest(int[][] matrix, int k) {
         
         // Count how many numbers <= mid
         int count = countLessEqual(matrix, mid);
-        
+
+        // Why `count < k` (strict) and not `count <= k`?
+        // If count == k, there are exactly k values <= mid, meaning
+        // mid COULD be the k-th smallest (or mid might not even exist
+        // in the matrix but a smaller value does). By going to hi = mid,
+        // we keep searching left to find the smallest value with count >= k.
         if (count < k) {
             lo = mid + 1;  // Not enough numbers, need larger value
         } else {
@@ -780,16 +854,26 @@ private int countLessEqual(int[][] matrix, int target) {
     int count = 0;
     int n = matrix.length;
     
-    // Start from bottom-left corner
+    // Start from bottom-left corner.
+    // Why bottom-left? It's the unique position where moving RIGHT
+    // increases the value and moving UP decreases it. This gives
+    // us a binary-search-like ability to navigate the 2D space.
     int row = n - 1;
     int col = 0;
-    
+
+    // Why two conditions? `row >= 0` stops us from going above the
+    // matrix. `col < n` stops us from going past the right edge.
+    // Together they keep us within bounds as we staircase through.
     while (row >= 0 && col < n) {
+        // Why `<= target`? If the bottom-left element of this
+        // sub-matrix is <= target, then ALL elements above it in
+        // the same column are also <= target (column is sorted).
+        // That's why we add (row + 1) elements at once.
         if (matrix[row][col] <= target) {
             count += row + 1;  // All elements in this column up to row
-            col++;             // Move right
+            col++;             // Move right to count the next column
         } else {
-            row--;             // Move up
+            row--;             // Too large, move up to smaller values
         }
     }
     
@@ -821,10 +905,13 @@ public int findPeakElement(int[] nums) {
     while (lo < hi) {
         int mid = lo + (hi - lo) / 2;
         
-        // Compare mid with its right neighbor
+        // Compare mid with its right neighbor.
+        // Why is `mid + 1` safe (no out-of-bounds)?
+        // Because `lo < hi` guarantees mid < hi, so mid + 1 <= hi,
+        // which is always a valid index.
         if (nums[mid] < nums[mid + 1]) {
-            // Ascending slope → peak is to the RIGHT
-            // mid is definitely NOT the peak
+            // Ascending slope: peak is to the RIGHT.
+            // mid is definitely NOT the peak (its neighbor is higher).
             lo = mid + 1;
         } else {
             // Descending slope → peak is LEFT or AT mid
@@ -870,22 +957,31 @@ Treat as: `[1, 3, 5, 7, 10, 11, 16, 20, 23, 30, 34, 60]`
 
 ```java
 public boolean searchMatrix(int[][] matrix, int target) {
+    // Guard against empty matrix or empty rows -- no elements to search.
     if (matrix.length == 0 || matrix[0].length == 0) {
         return false;
     }
-    
+
     int m = matrix.length;
     int n = matrix[0].length;
     int lo = 0;
-    int hi = m * n - 1;  // Total elements - 1
+    // Why m * n - 1? We're treating the 2D matrix as a flat 1D array
+    // of length m*n. The last valid index is m*n - 1 (0-indexed).
+    int hi = m * n - 1;
     
     while (lo < hi) {
         int mid = lo + (hi - lo) / 2;
         
-        // Convert 1D index to 2D coordinates
+        // Convert 1D index to 2D coordinates.
+        // Why division and modulo? Think of the flat array being
+        // "wrapped" every n elements. Division tells you which row
+        // you've wrapped into; modulo tells you how far along that row.
         int row = mid / n;  // Which row?
         int col = mid % n;  // Which column?
-        
+
+        // Why `>=` (Template A pattern)? We want the FIRST position
+        // where the value >= target. If it equals the target, we found it.
+        // If it's greater, the target might be further left.
         if (matrix[row][col] >= target) {
             hi = mid;
         } else {
@@ -1309,4 +1405,66 @@ return lo;  // or with validation
 3. Time yourself: aim for 15-20 minutes per medium problem
 4. Focus on recognizing patterns quickly
 
-Good luck! 🎯
+Good luck!
+
+---
+
+## Appendix: Conditional Quick Reference
+
+A consolidated table of every key conditional in binary search, what it means, and when to use it.
+
+### Loop Conditions
+
+| Conditional | Meaning | When to Use |
+|---|---|---|
+| `while (lo < hi)` | Loop until one candidate remains (`lo == hi`). | The standard for both Template A and B. Use this in nearly all binary search problems. The loop guarantees convergence to a single candidate. |
+| `while (lo <= hi)` | Loop until the search space is empty (`lo > hi`). | Classic textbook binary search that returns inside the loop on match. More error-prone because you must handle the return inside the loop AND after it. Prefer `lo < hi` in interviews. |
+
+### Mid Calculation
+
+| Conditional | Meaning | When to Use |
+|---|---|---|
+| `mid = lo + (hi - lo) / 2` | Left-biased mid. When two elements remain, picks the LEFT one. | Template A (Minimize/Find First). Pair with `hi = mid` and `lo = mid + 1`. Prevents infinite loops because `hi = mid` always shrinks the window. |
+| `mid = lo + (hi - lo + 1) / 2` | Right-biased mid. When two elements remain, picks the RIGHT one. | Template B (Maximize/Find Last). Pair with `lo = mid` and `hi = mid - 1`. The `+1` is CRITICAL: without it, `lo = mid` with left-biased mid causes an infinite loop when two elements remain. |
+
+### Pointer Updates
+
+| Conditional | Meaning | When to Use |
+|---|---|---|
+| `hi = mid` | Keep mid in the search space (mid might be the answer). | When the condition at mid is satisfied and you want to search LEFT for a potentially better (smaller) answer. Always pair with left-biased mid. |
+| `hi = mid - 1` | Exclude mid from the search space (mid is definitely not the answer). | When you are CERTAIN mid cannot be the answer. Always pair with right-biased mid (Template B). |
+| `lo = mid + 1` | Exclude mid, search right. | When mid fails the condition and the answer must be strictly larger. Safe with both left-biased and right-biased mid. |
+| `lo = mid` | Keep mid in the search space, search right. | When mid satisfies the condition and you want to search RIGHT for a potentially better (larger) answer. MUST use right-biased mid to avoid infinite loops. |
+
+### Boundary Initialization
+
+| Conditional | Meaning | When to Use |
+|---|---|---|
+| `lo = 0, hi = len - 1` | Search space is the entire array (inclusive on both ends). | Standard for index-based searches (first/last occurrence, rotated array, peak finding). |
+| `lo = 0, hi = len` | Search space includes one position past the array end. | Insert position problems where the answer could be at index `len` (appending). |
+| `lo = min_val, hi = max_val` | Search space is a range of VALUES, not indices. | Binary search on answer space (ship capacity, eating speed, distance). Bounds come from the problem constraints. |
+
+### Common Condition Checks
+
+| Conditional | Meaning | When to Use |
+|---|---|---|
+| `nums[mid] >= target` then `hi = mid` | Find first position where value >= target (lower bound). | First occurrence, insert position. Uses `>=` to capture the exact target AND values after it, creating a clean two-way partition. |
+| `nums[mid] <= target` then `lo = mid` | Find last position where value <= target (upper bound). | Last occurrence. Uses `<=` to capture the exact target AND values before it. |
+| `nums[mid] < target` then `lo = mid + 1` | Mid is strictly too small, exclude it. | When you need to skip past values that are definitively less than what you want. |
+| `nums[lo] <= nums[mid]` | Left half `[lo..mid]` is sorted. | Rotated array search. The `<=` (not `<`) handles the case where `lo == mid` (two elements remaining), where the single-element left "half" is trivially sorted. |
+| `nums[lo] <= target && target <= nums[mid]` | Target falls within the sorted left half's range. | Rotated array: once you know the left half is sorted, this range check reliably determines if the target is there. |
+| `nums[mid] < nums[mid + 1]` | Ascending slope -- a peak must exist to the right. | Peak finding. If the next element is higher, mid cannot be a peak and a peak is guaranteed to the right (by the constraint that boundaries are negative infinity). |
+| `count < k` then `lo = mid + 1` | Fewer than k elements exist at or below mid. | K-th smallest problems. Strict `<` because `count == k` means mid could be the answer (we keep it via `hi = mid` in the else branch). |
+| `currentSum + num > maxSum` | Adding this element would exceed the subarray limit. | Greedy feasibility checks in "split array" / "ship packages" problems. Strict `>` because equaling the limit is still valid. |
+| `position[i] - lastPos >= minDist` | Gap between current and last placed item meets the minimum. | Greedy feasibility checks for "maximize minimum distance" problems. Uses `>=` because exactly meeting the minimum distance is valid. |
+| `mid <= x / mid` | Equivalent to `mid^2 <= x` without overflow risk. | Integer square root. Rearranging avoids `mid * mid` which can overflow 32-bit integers. |
+| `hours <= h` | Koko finishes within the allowed time. | Feasibility check for eating speed. Uses `<=` because finishing early is acceptable. |
+
+### Return Values
+
+| Conditional | Meaning | When to Use |
+|---|---|---|
+| `return lo` (equivalently `return hi`) | After `while (lo < hi)`, `lo == hi` is the converged answer. | BS on answer, peak finding, K-th smallest -- problems where an answer is guaranteed to exist. |
+| `return (nums[lo] == target) ? lo : -1` | Validate that the converged candidate actually matches. | Exact match problems (standard search, rotated array) where the target might not exist in the array. |
+| `return (lo < n && nums[lo] == target) ? lo : -1` | Bounds check + match validation. | First occurrence. The bounds check `lo < n` guards against the case where the target is larger than all elements (lo could equal n). |
+| `return lo + 1` | Insert after the converged position. | Insert position when the target is larger than all elements in the array. |

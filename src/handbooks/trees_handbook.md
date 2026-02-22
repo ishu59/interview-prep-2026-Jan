@@ -113,7 +113,10 @@ def dfs(node: TreeNode) -> ResultType:
     Basic template for tree DFS.
     Most tree problems follow this structure.
     """
-    # Base case: empty node
+    # Base case: why check for None?
+    # Recursion will always reach past the leaves. A leaf's children are None.
+    # Without this check, accessing node.left or node.val would crash.
+    # This is the "bottom of the nesting doll" -- nothing left to open.
     if not node:
         return base_value
 
@@ -187,6 +190,10 @@ def all_paths(root: TreeNode) -> list[list[int]]:
 
         path.append(node.val)
 
+        # Why check BOTH left AND right are None?
+        # A leaf is a node with NO children at all. If only one child
+        # is None, the node is NOT a leaf -- it still has a subtree.
+        # We only record a complete path when we've truly reached the end.
         if not node.left and not node.right:  # Leaf
             result.append(path.copy())
         else:
@@ -215,11 +222,16 @@ def iterative_dfs(root: TreeNode) -> list:
     result = []
     stack = [root]
 
+    # Why does `while stack` terminate?
+    # Each node is pushed at most once and popped exactly once.
+    # We never re-add a node, so the stack shrinks to empty.
     while stack:
         node = stack.pop()
         result.append(node.val)
 
-        # Push right first so left is processed first
+        # Push right first so left is processed first (stack is LIFO).
+        # Why check `if node.right`? Pushing None would cause a crash
+        # when we later try to access node.val on a None object.
         if node.right:
             stack.append(node.right)
         if node.left:
@@ -235,8 +247,13 @@ def iterative_inorder(root: TreeNode) -> list:
     stack = []
     current = root
 
+    # Why `current or stack`? Two conditions because we alternate between
+    # two phases: (1) drilling left (`current` is not None), and
+    # (2) backtracking via the stack (`stack` is not empty).
+    # The loop ends only when BOTH are exhausted -- no node left to
+    # drill into AND no node saved to backtrack to.
     while current or stack:
-        # Go all the way left
+        # Go all the way left -- push each node so we can return to it
         while current:
             stack.append(current)
             current = current.left
@@ -245,7 +262,8 @@ def iterative_inorder(root: TreeNode) -> list:
         current = stack.pop()
         result.append(current.val)
 
-        # Move to right subtree
+        # Move to right subtree (may be None, which just means
+        # the inner `while current` won't execute next iteration)
         current = current.right
 
     return result
@@ -270,6 +288,11 @@ def level_order(root: TreeNode) -> list[list[int]]:
     queue = deque([root])
 
     while queue:
+        # Why snapshot the length here?
+        # The queue currently holds ALL nodes of the current level.
+        # As we process them, we add their children (next level) to the
+        # SAME queue. Snapshotting `level_size` before the loop ensures
+        # we only process THIS level's nodes, not the new children.
         level_size = len(queue)
         level = []
 
@@ -277,6 +300,7 @@ def level_order(root: TreeNode) -> list[list[int]]:
             node = queue.popleft()
             level.append(node.val)
 
+            # Only enqueue non-None children; None means no child exists
             if node.left:
                 queue.append(node.left)
             if node.right:
@@ -287,7 +311,7 @@ def level_order(root: TreeNode) -> list[list[int]]:
     return result
 ```
 
-**Key Insight:** The `for` loop with `level_size` ensures we process exactly one level at a time.
+**Key Insight:** The `for` loop with `level_size` ensures we process exactly one level at a time. Without this snapshot, newly added children would be processed in the same iteration, mixing levels together.
 
 ---
 
@@ -636,6 +660,9 @@ def isBalanced(root: TreeNode) -> bool:
             return 0
 
         left_height = check_height(node.left)
+        # Why check `== -1`? This is early-termination propagation.
+        # If ANY subtree below is unbalanced, -1 bubbles up all the way
+        # to the root. No point checking further -- the whole tree fails.
         if left_height == -1:
             return -1
 
@@ -643,6 +670,10 @@ def isBalanced(root: TreeNode) -> bool:
         if right_height == -1:
             return -1
 
+        # Why `> 1` and not `>= 1`?
+        # A balanced tree allows heights to differ by AT MOST 1.
+        # diff=0 (perfectly balanced) and diff=1 (slightly uneven) are OK.
+        # Only diff=2 or more is unbalanced, hence `> 1`.
         if abs(left_height - right_height) > 1:
             return -1
 
@@ -713,7 +744,11 @@ def minDepth(root: TreeNode) -> int:
     if not root:
         return 0
 
-    # If one child is missing, we must go through the other
+    # Why not just `min(left, right)` like maxDepth?
+    # If one child is None, that side returns 0, but a None child is
+    # NOT a leaf -- we haven't reached a real endpoint. Taking min
+    # would incorrectly say depth=1 for a node with one child.
+    # We MUST go through the existing child to find a real leaf.
     if not root.left:
         return 1 + minDepth(root.right)
     if not root.right:
@@ -733,7 +768,9 @@ def minDepth_bfs(root: TreeNode) -> int:
     while queue:
         node, depth = queue.popleft()
 
-        # First leaf we encounter is minimum depth
+        # Why return immediately at the first leaf?
+        # BFS explores level by level, so the FIRST leaf we encounter
+        # is guaranteed to be at the shallowest depth. No need to continue.
         if not node.left and not node.right:
             return depth
 
@@ -757,10 +794,18 @@ def minDepth_bfs(root: TreeNode) -> int:
 
 ```python
 def hasPathSum(root: TreeNode, targetSum: int) -> bool:
+    # Why return False for None and not True?
+    # None is not a leaf -- it's the absence of a node.
+    # A path must end at an actual leaf, so hitting None means
+    # this branch has no valid endpoint.
     if not root:
         return False
 
-    # Check if leaf with exact sum
+    # Why check the sum only at a LEAF, not at every node?
+    # The problem requires a ROOT-TO-LEAF path. If we check at internal
+    # nodes, we might return True for a partial path that doesn't reach
+    # a leaf. Example: tree [1,2], target=1 -- node 1 matches, but
+    # the path 1->2 doesn't sum to 1 at a leaf.
     if not root.left and not root.right:
         return root.val == targetSum
 

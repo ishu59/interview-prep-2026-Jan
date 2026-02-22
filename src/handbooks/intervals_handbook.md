@@ -99,10 +99,11 @@ def merge(intervals: list[list[int]]) -> list[list[int]]:
     Merge all overlapping intervals.
     Sort by start, then greedily extend.
     """
+    # Edge case: nothing to merge
     if not intervals:
         return []
 
-    # Sort by start time
+    # Sort by start time so we only need to compare neighbors
     intervals.sort(key=lambda x: x[0])
 
     merged = [intervals[0]]
@@ -110,9 +111,17 @@ def merge(intervals: list[list[int]]) -> list[list[int]]:
     for current in intervals[1:]:
         last = merged[-1]
 
-        if current[0] <= last[1]:  # Overlapping
+        # Why `<=` and not `<`?
+        # Touching intervals like [1,3] and [3,5] should merge into [1,5].
+        # With `<`, we would miss the case where current starts exactly
+        # where last ends, and they'd stay separate incorrectly.
+        if current[0] <= last[1]:  # Overlapping or touching
+            # Why max and not just replace?
+            # The previous interval might already extend beyond the current
+            # one. E.g., last=[1,10], current=[2,5] -- replacing would shrink
+            # the merged interval. max keeps the farthest-reaching end.
             last[1] = max(last[1], current[1])
-        else:  # Not overlapping
+        else:  # Gap between intervals, no overlap
             merged.append(current)
 
     return merged
@@ -131,19 +140,34 @@ def insert(intervals: list[list[int]], newInterval: list[int]) -> list[list[int]
     i = 0
     n = len(intervals)
 
-    # Add all intervals that end before new one starts
+    # PHASE 1: Add all intervals that end before the new one starts.
+    # Why `intervals[i][1] < newInterval[0]`?
+    # We compare the existing interval's END with the new interval's START.
+    # If the existing one ends before the new one even begins, there is
+    # zero overlap -- it belongs entirely to the "before" region.
+    # Why `<` and not `<=`? If they touch (end == start), that is still
+    # considered overlapping and should be merged in the next phase.
     while i < n and intervals[i][1] < newInterval[0]:
         result.append(intervals[i])
         i += 1
 
-    # Merge overlapping intervals
+    # PHASE 2: Merge all intervals that overlap with newInterval.
+    # Why `intervals[i][0] <= newInterval[1]`?
+    # An interval overlaps with newInterval if it starts before (or at)
+    # where newInterval ends. Combined with Phase 1 already skipping
+    # intervals that end before newInterval starts, this captures
+    # exactly the overlapping set.
     while i < n and intervals[i][0] <= newInterval[1]:
+        # Why min/max instead of just taking the current interval's values?
+        # We are building one big merged interval that spans all overlaps.
+        # min picks the earliest start, max picks the latest end.
         newInterval[0] = min(newInterval[0], intervals[i][0])
         newInterval[1] = max(newInterval[1], intervals[i][1])
         i += 1
     result.append(newInterval)
 
-    # Add remaining intervals
+    # PHASE 3: Add remaining intervals (all start after newInterval ends).
+    # No condition needed beyond bounds -- everything left is after.
     while i < n:
         result.append(intervals[i])
         i += 1
@@ -164,16 +188,24 @@ def eraseOverlapIntervals(intervals: list[list[int]]) -> int:
     if not intervals:
         return 0
 
-    # Sort by end time
+    # Why sort by END time, not start time?
+    # We want to keep as many intervals as possible. An interval that
+    # ends earlier leaves more room for future intervals. Sorting by
+    # end time lets the greedy choice (keep earliest-ending) be optimal.
     intervals.sort(key=lambda x: x[1])
 
     count = 0
     prev_end = float('-inf')
 
     for start, end in intervals:
-        if start >= prev_end:  # No overlap
+        # Why `>=` and not `>`?
+        # If the current interval starts exactly where the previous one
+        # ended (e.g., [1,3] and [3,5]), they do NOT overlap -- one ends
+        # as the other begins. So `>=` correctly treats touching as
+        # non-overlapping.
+        if start >= prev_end:  # No overlap -- keep this interval
             prev_end = end
-        else:  # Overlap, remove current (keep previous)
+        else:  # Overlap -- remove current (keep previous, it ends earlier)
             count += 1
 
     return count
@@ -191,10 +223,13 @@ def minMeetingRooms(intervals: list[list[int]]) -> int:
     """
     events = []
     for start, end in intervals:
-        events.append((start, 1))   # Start event
-        events.append((end, -1))    # End event
+        events.append((start, 1))   # Meeting begins: need +1 room
+        events.append((end, -1))    # Meeting ends: free -1 room
 
-    # Sort by time, end events before start events at same time
+    # Why sort by (time, delta) where delta is +1 or -1?
+    # At the same timestamp, we process end events (-1) before start
+    # events (+1). If a meeting ends at 10 and another starts at 10,
+    # the room is freed first, then reused -- so we don't over-count.
     events.sort(key=lambda x: (x[0], x[1]))
 
     max_rooms = current_rooms = 0
@@ -216,15 +251,22 @@ def minMeetingRooms_heap(intervals: list[list[int]]) -> int:
 
     intervals.sort(key=lambda x: x[0])
 
-    # Heap tracks end times of meetings in progress
+    # Heap tracks end times of meetings currently in progress.
+    # The smallest end time is always at heap[0] (min-heap property).
     heap = []
 
     for start, end in intervals:
-        # If earliest ending meeting is done, reuse that room
+        # Why `heap[0] <= start` and not `< start`?
+        # If the earliest-ending meeting ends at exactly the same time
+        # this one starts, the room is free -- that meeting is over.
+        # `<=` correctly allows reuse in this case. With `<`, we would
+        # allocate an unnecessary extra room for back-to-back meetings.
         if heap and heap[0] <= start:
             heapq.heappop(heap)
         heapq.heappush(heap, end)
 
+    # Each entry in the heap is a room still in use.
+    # The heap size = number of rooms needed at peak.
     return len(heap)
 ```
 
@@ -243,18 +285,31 @@ def intervalIntersection(
     result = []
     i, j = 0, 0
 
+    # Why `and` not `or`? Once either list is exhausted, there can be
+    # no more intersections -- an intersection requires one interval
+    # from each list. So we stop as soon as one list runs out.
     while i < len(firstList) and j < len(secondList):
         a_start, a_end = firstList[i]
         b_start, b_end = secondList[j]
 
-        # Find overlap
+        # The intersection of two intervals (if it exists) starts at the
+        # later of the two starts and ends at the earlier of the two ends.
         start = max(a_start, b_start)
         end = min(a_end, b_end)
 
+        # Why `start <= end`?
+        # If the computed start is after the computed end, the two
+        # intervals do not actually overlap -- there is a gap between
+        # them. Only when start <= end is there a valid (possibly
+        # single-point) intersection to record.
         if start <= end:
             result.append([start, end])
 
-        # Move pointer of interval that ends first
+        # Why advance the pointer with the smaller end?
+        # The interval that ends first cannot overlap with anything
+        # further in the other list (which only has later intervals).
+        # The interval that ends later might still overlap with the
+        # next interval in the other list, so we keep it.
         if a_end < b_end:
             i += 1
         else:
@@ -280,13 +335,22 @@ def minIntervalsToCover(intervals: list[list[int]], target: list[int]) -> int:
     i = 0
     current_end = target_start
 
+    # Why `<` and not `<=`?
+    # We need to cover up to target_end. Once current_end reaches
+    # target_end, the range is fully covered -- no more work needed.
     while current_end < target_end:
-        # Find interval that starts <= current_end and extends farthest
         max_end = current_end
+        # Why `intervals[i][0] <= current_end`?
+        # An interval can only extend our coverage if it starts at or
+        # before where we currently are. If it starts after current_end,
+        # there would be a gap in coverage. Among all intervals that
+        # start in time, we greedily pick the one reaching farthest.
         while i < len(intervals) and intervals[i][0] <= current_end:
             max_end = max(max_end, intervals[i][1])
             i += 1
 
+        # If no interval could extend our reach, there is an
+        # uncoverable gap -- the target range cannot be fully covered.
         if max_end == current_end:  # Can't extend
             return -1
 
@@ -364,11 +428,17 @@ def merge(intervals: list[list[int]]) -> list[list[int]]:
     merged = []
 
     for interval in intervals:
-        # If empty or no overlap with last
+        # Why `merged[-1][1] < interval[0]` (strict `<`)?
+        # This means: "last merged interval ends BEFORE current starts."
+        # If they touch (e.g., [1,3] and [3,6]), `<` is false so we
+        # fall into the else branch and merge them. This treats touching
+        # intervals as overlapping, which is the standard for LC 56.
         if not merged or merged[-1][1] < interval[0]:
             merged.append(interval)
         else:
-            # Merge with last
+            # Why max? The current interval might end before the last
+            # merged one (it's fully contained). max ensures we keep
+            # the farthest-reaching end.
             merged[-1][1] = max(merged[-1][1], interval[1])
 
     return merged
@@ -399,12 +469,18 @@ def insert(intervals: list[list[int]], newInterval: list[int]) -> list[list[int]
     i = 0
     n = len(intervals)
 
-    # Add intervals completely before newInterval
+    # Phase 1: Collect intervals entirely before newInterval.
+    # Why `intervals[i][1] < newInterval[0]`?
+    # The existing interval's end is before the new interval's start,
+    # meaning no overlap. Strict `<` because if they touch, we merge.
     while i < n and intervals[i][1] < newInterval[0]:
         result.append(intervals[i])
         i += 1
 
-    # Merge overlapping intervals
+    # Phase 2: Merge all intervals overlapping with newInterval.
+    # Why `intervals[i][0] <= newInterval[1]`?
+    # The existing interval starts before (or exactly where) the new
+    # interval ends -- so they overlap or touch. We absorb it.
     while i < n and intervals[i][0] <= newInterval[1]:
         newInterval = [
             min(newInterval[0], intervals[i][0]),
@@ -413,7 +489,7 @@ def insert(intervals: list[list[int]], newInterval: list[int]) -> list[list[int]
         i += 1
     result.append(newInterval)
 
-    # Add remaining intervals
+    # Phase 3: Everything remaining starts after newInterval -- no overlap.
     result.extend(intervals[i:])
 
     return result
@@ -434,16 +510,22 @@ def eraseOverlapIntervals(intervals: list[list[int]]) -> int:
     if not intervals:
         return 0
 
-    # Sort by end time
+    # Why sort by end time? Intervals ending earlier leave more space
+    # for future intervals. This greedy choice minimizes removals.
     intervals.sort(key=lambda x: x[1])
 
     removals = 0
     prev_end = intervals[0][1]
 
     for i in range(1, len(intervals)):
-        if intervals[i][0] < prev_end:  # Overlap
+        # Why `<` and not `<=`?
+        # If current starts exactly where previous ends (e.g., [1,3]
+        # and [3,5]), they do NOT overlap -- they are back-to-back.
+        # Strict `<` means: "starts before previous ends" = true overlap.
+        if intervals[i][0] < prev_end:  # Overlap -- remove current
             removals += 1
         else:
+            # No overlap -- keep this interval, update prev_end
             prev_end = intervals[i][1]
 
     return removals
@@ -470,20 +552,32 @@ def maxEvents(events: list[list[int]]) -> int:
     i = 0
     n = len(events)
 
+    # Why `i < n or heap`?
+    # We continue as long as there are unprocessed events (i < n) OR
+    # events already in the heap waiting to be attended.
     while i < n or heap:
+        # If the heap is empty, skip forward to the next event's start
+        # day. This avoids iterating through empty days one by one.
         if not heap:
             day = events[i][0]
 
-        # Add all events starting today
+        # Add all events that have started by today.
+        # Why `events[i][0] <= day`? An event is available to attend
+        # on any day from its start through its end. We push all
+        # events whose start day has arrived.
         while i < n and events[i][0] <= day:
             heapq.heappush(heap, events[i][1])
             i += 1
 
-        # Remove events that have ended
+        # Why `heap[0] < day` (strict `<`)?
+        # An event with end time equal to today can still be attended
+        # today. Only events that ended strictly before today are
+        # expired and should be discarded.
         while heap and heap[0] < day:
             heapq.heappop(heap)
 
-        # Attend event ending earliest
+        # Greedily attend the event ending soonest (min-heap top).
+        # This maximizes the chance of attending future events.
         if heap:
             heapq.heappop(heap)
             count += 1
@@ -508,6 +602,11 @@ def canAttendMeetings(intervals: list[list[int]]) -> bool:
     intervals.sort(key=lambda x: x[0])
 
     for i in range(1, len(intervals)):
+        # Why `<` and not `<=`?
+        # If meeting i starts exactly when meeting i-1 ends (e.g.,
+        # [1,3] and [3,5]), the person finishes one and walks into
+        # the next -- no conflict. Strict `<` catches only true
+        # overlaps where a meeting starts before the previous ends.
         if intervals[i][0] < intervals[i-1][1]:
             return False
 
@@ -528,6 +627,12 @@ def minMeetingRooms(intervals: list[list[int]]) -> int:
         events.append((start, 1))
         events.append((end, -1))
 
+    # Why just events.sort() (sorting by tuple default)?
+    # Default tuple sort: first by time, then by delta.
+    # Since -1 < 1, at the same timestamp, end events (-1) are
+    # processed before start events (+1). This means if one meeting
+    # ends at time T and another starts at T, the room is freed first
+    # -- so we don't over-count concurrent rooms.
     events.sort()
 
     max_rooms = rooms = 0
@@ -547,13 +652,21 @@ def minMeetingRooms_heap(intervals: list[list[int]]) -> int:
         return 0
 
     intervals.sort(key=lambda x: x[0])
-    heap = []  # End times
+    heap = []  # End times of meetings currently using rooms
 
     for start, end in intervals:
+        # Why `heap[0] <= start`?
+        # heap[0] is the earliest end time among all ongoing meetings.
+        # If that meeting ends at or before the current meeting starts,
+        # the room is free to reuse. We pop it (freeing the room) and
+        # then push the new meeting's end time.
+        # `<=` (not `<`) because a meeting ending at time 5 and one
+        # starting at time 5 do not conflict -- the room is available.
         if heap and heap[0] <= start:
             heapq.heappop(heap)
         heapq.heappush(heap, end)
 
+    # The heap size equals the number of rooms in use at peak overlap.
     return len(heap)
 ```
 
@@ -572,15 +685,20 @@ def employeeFreeTime(schedule: list[list[list[int]]]) -> list[list[int]]:
 
     all_intervals.sort(key=lambda x: x[0])
 
-    # Merge to find busy times
+    # Merge to find consolidated busy times
     merged = [all_intervals[0]]
     for interval in all_intervals[1:]:
+        # Why `<=`? If one employee's shift ends at 5 and another's
+        # starts at 5, there is no free time gap between them --
+        # the company is continuously busy. So touching = merge.
         if interval[0] <= merged[-1][1]:
             merged[-1][1] = max(merged[-1][1], interval[1])
         else:
             merged.append(interval)
 
-    # Gaps between merged = free time
+    # Gaps between merged busy intervals = everyone's free time.
+    # Each gap [merged[i-1] end, merged[i] start] is a window where
+    # no employee is working.
     result = []
     for i in range(1, len(merged)):
         result.append([merged[i-1][1], merged[i][0]])
@@ -605,15 +723,24 @@ def intervalIntersection(
     result = []
     i, j = 0, 0
 
+    # Both pointers must be in bounds. Once one list is exhausted,
+    # no more intersections are possible.
     while i < len(firstList) and j < len(secondList):
-        # Find intersection
+        # The intersection starts at the later start and ends at the
+        # earlier end. This is the region both intervals share.
         start = max(firstList[i][0], secondList[j][0])
         end = min(firstList[i][1], secondList[j][1])
 
+        # Why `start <= end`?
+        # If start > end, the intervals don't actually overlap (there
+        # is a gap). Only record an intersection when start <= end.
+        # Note: `<=` (not `<`) to include single-point intersections
+        # like [3,3] where two intervals just touch.
         if start <= end:
             result.append([start, end])
 
-        # Move pointer with smaller end
+        # Advance the pointer whose interval ends first. That interval
+        # cannot intersect with anything further in the other list.
         if firstList[i][1] < secondList[j][1]:
             i += 1
         else:
@@ -637,17 +764,25 @@ def findMinArrowPoints(points: list[list[int]]) -> int:
     if not points:
         return 0
 
-    # Sort by end position
+    # Why sort by end? We want to shoot an arrow as late as possible
+    # within the first balloon's range, to also hit as many subsequent
+    # overlapping balloons as possible. Sorting by end and placing the
+    # arrow at current_end is optimal for this greedy strategy.
     points.sort(key=lambda x: x[1])
 
     arrows = 1
     current_end = points[0][1]
 
     for start, end in points[1:]:
+        # Why `>` and not `>=`?
+        # Balloons are inclusive ranges. If a balloon starts exactly
+        # at current_end (e.g., arrow at 3, balloon [3,5]), the arrow
+        # at position 3 still pops it. Only if it starts strictly
+        # after does it need a new arrow.
         if start > current_end:  # Need new arrow
             arrows += 1
             current_end = end
-        # else: current arrow covers this balloon
+        # else: current arrow at current_end also pops this balloon
 
     return arrows
 ```
@@ -667,12 +802,21 @@ def videoStitching(clips: list[list[int]], time: int) -> int:
     farthest = 0
     i = 0
 
+    # Why `current_end < time`?
+    # We need to cover [0, time]. Once current_end reaches time,
+    # the full range is covered.
     while current_end < time:
-        # Find clip that starts <= current_end and extends farthest
+        # Why `clips[i][0] <= current_end`?
+        # A clip can only extend our coverage if it starts at or
+        # before our current coverage boundary. If it starts after,
+        # there would be a gap. Among all valid clips, we greedily
+        # pick the one whose end reaches farthest.
         while i < len(clips) and clips[i][0] <= current_end:
             farthest = max(farthest, clips[i][1])
             i += 1
 
+        # If no clip could push farthest beyond current_end,
+        # there is an uncoverable gap in the timeline.
         if farthest == current_end:  # Can't extend
             return -1
 
@@ -690,20 +834,33 @@ def videoStitching(clips: list[list[int]], time: int) -> int:
 
 ```python
 def jump(nums: list[int]) -> int:
+    # Already at or past the end -- no jumps needed.
     if len(nums) <= 1:
         return 0
 
     jumps = 0
-    current_end = 0
-    farthest = 0
+    current_end = 0    # Farthest index reachable with `jumps` jumps
+    farthest = 0       # Farthest index reachable with `jumps + 1` jumps
 
+    # Why `len(nums) - 1` and not `len(nums)`?
+    # We never need to "jump from" the last index. If we reach it,
+    # we are done. Iterating to len(nums) could cause an unnecessary
+    # extra jump count.
     for i in range(len(nums) - 1):
         farthest = max(farthest, i + nums[i])
 
+        # Why `i == current_end`?
+        # current_end is the boundary of what the current jump covers.
+        # When i reaches this boundary, we have explored all positions
+        # reachable by the current number of jumps. We must now "use"
+        # the next jump, extending our reach to farthest.
         if i == current_end:
             jumps += 1
             current_end = farthest
 
+            # Why `>=` and not `==`?
+            # farthest might overshoot the last index. We do not need
+            # to land exactly on it -- reaching or passing it is enough.
             if current_end >= len(nums) - 1:
                 break
 

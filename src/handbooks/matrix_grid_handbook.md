@@ -74,6 +74,11 @@ directions = [(0, 1), (0, -1), (1, 0), (-1, 0),
 rows, cols = len(grid), len(grid[0])
 for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
     nr, nc = r + dr, c + dc
+    # Why chained comparison `0 <= nr < rows`?
+    # Python allows this syntax as shorthand for `0 <= nr and nr < rows`.
+    # It checks BOTH lower bound (not negative) and upper bound (within grid).
+    # Why `<` and not `<=`? Because rows/cols are LENGTHS, and valid indices
+    # go from 0 to length-1. Index == length is already out of bounds.
     if 0 <= nr < rows and 0 <= nc < cols:
         # (nr, nc) is a valid neighbor -- process it
         pass
@@ -151,8 +156,17 @@ def grid_bfs(grid: list[list[int]], starts: list[tuple[int, int]]) -> int:
 
         for dr, dc in directions:
             nr, nc = r + dr, c + dc
+            # Why check ALL THREE conditions (bounds, visited, wall)?
+            # 1. Bounds: accessing grid[-1][0] would wrap or crash
+            # 2. Not visited: prevents revisiting and infinite loops
+            # 3. Not a wall: respects the grid's traversal rules
+            # Order matters for short-circuit: bounds check FIRST prevents
+            # IndexError, then visited check avoids redundant work.
             if 0 <= nr < rows and 0 <= nc < cols and (nr, nc) not in visited:
                 if grid[nr][nc] != WALL:  # Check cell is valid
+                    # Mark visited NOW, not when popping. If we wait until
+                    # popping, the same cell gets added to the queue by
+                    # multiple neighbors, wasting time and memory.
                     visited.add((nr, nc))
                     queue.append((nr, nc, dist + 1))
 
@@ -172,9 +186,14 @@ def grid_dfs(grid: list[list[int]], r: int, c: int, visited: set) -> int:
     rows, cols = len(grid), len(grid[0])
     directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 
-    # Base cases
+    # Base cases: Why two separate checks?
+    # First: boundary check -- DFS may step outside the grid since we
+    # recurse with r+dr BEFORE checking. Must reject out-of-bounds.
     if r < 0 or r >= rows or c < 0 or c >= cols:
         return 0
+    # Second: skip if already visited OR cell is water (0).
+    # Why check BOTH? visited prevents infinite loops (A visits B,
+    # B visits A); grid[r][c]==0 stops at water boundaries.
     if (r, c) in visited or grid[r][c] == 0:
         return 0
 
@@ -369,21 +388,28 @@ def numIslands(grid: list[list[str]]) -> int:
     count = 0
 
     def dfs(r, c):
+        # Out of bounds -- recursive DFS explores blindly then rejects
         if r < 0 or r >= rows or c < 0 or c >= cols:
             return
+        # Not land (either water '0' or already "sunk")
         if grid[r][c] != '1':
             return
 
+        # Why `grid[r][c] = '0'` instead of a visited set?
+        # In-place marking ("sinking the island") saves O(R*C) space.
+        # Tradeoff: this MUTATES the input. If you need to preserve
+        # the original grid, use a visited set instead.
         grid[r][c] = '0'  # Mark as visited by sinking
 
         for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
             dfs(r + dr, c + dc)
 
+    # Scan every cell: each unvisited '1' is a NEW island's starting point
     for r in range(rows):
         for c in range(cols):
             if grid[r][c] == '1':
-                dfs(r, c)
-                count += 1
+                dfs(r, c)    # Sink the entire island
+                count += 1   # Count it
 
     return count
 ```
