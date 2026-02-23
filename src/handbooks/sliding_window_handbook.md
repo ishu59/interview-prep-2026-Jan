@@ -130,6 +130,10 @@ def fixed_window(arr: list, k: int):
     Window always has exactly k elements.
     """
     n = len(arr)
+    # Why `n < k`?
+    # We cannot form even one window of size k if the array is shorter than k.
+    # Without this guard, arr[:k] would silently succeed but the loop would
+    # never execute, and we'd return an uninitialized result.
     if n < k:
         return None  # Not enough elements
 
@@ -370,6 +374,9 @@ That's `right - left + 1` subarrays, all valid (since they're subsets of a valid
 
 ```python
 def max_sum_subarray_k(arr: list[int], k: int) -> int:
+    # Why `len(arr) < k`?
+    # If the array has fewer elements than k, no window of size k exists.
+    # Returning 0 early avoids an empty sum and an idle loop.
     if len(arr) < k:
         return 0
 
@@ -377,7 +384,10 @@ def max_sum_subarray_k(arr: list[int], k: int) -> int:
     window_sum = sum(arr[:k])
     max_sum = window_sum
 
-    # Slide window
+    # Why `range(k, len(arr))`?
+    # The first window [0, k-1] is already initialized above.
+    # We start sliding from index k, where arr[i-k] is the element leaving
+    # and arr[i] is the element entering, keeping the window at exactly size k.
     for i in range(k, len(arr)):
         window_sum += arr[i] - arr[i - k]  # Add new, remove old
         max_sum = max(max_sum, window_sum)
@@ -486,6 +496,9 @@ Output: [3, 3, 5, 5, 6, 7]
 from collections import Counter
 
 def findAnagrams(s: str, p: str) -> list[int]:
+    # Why `len(s) < len(p)`?
+    # A window of size len(p) cannot even fit inside s, so no anagram
+    # is possible. Returning early avoids Counter comparisons on empty data.
     if len(s) < len(p):
         return []
 
@@ -539,6 +552,9 @@ def findAnagrams_optimized(s: str, p: str) -> list[int]:
     for i in range(len(s)):
         # Add s[i] to window
         char = s[i]
+        # Why `if char in p_count`?
+        # Characters not in p cannot contribute to or break an anagram match.
+        # We only track "debt" for characters that p actually requires.
         if char in p_count:
             p_count[char] -= 1
             # Why check `== 0` specifically? p_count[char] tracks the
@@ -562,7 +578,12 @@ def findAnagrams_optimized(s: str, p: str) -> list[int]:
                     matches -= 1
                 p_count[old_char] += 1
 
-        # Check for anagram
+        # Why `matches == needed`?
+        # `needed` is the number of UNIQUE characters in p. `matches` counts
+        # how many of those have exactly the right frequency in the window.
+        # When they are equal, every unique character in p is satisfied --
+        # the window is an anagram. Comparing counts (not the full dict)
+        # is O(1) instead of O(alphabet).
         if matches == needed:
             result.append(i - len(p) + 1)
 
@@ -604,6 +625,11 @@ def lengthOfLongestSubstring(s: str) -> int:
         if char in char_index and char_index[char] >= left:
             left = char_index[char] + 1
 
+        # Why always update `char_index[char] = right` (even after a jump)?
+        # We need to remember the LATEST position of every character so that
+        # future duplicates can jump `left` correctly. If we skip this update
+        # after a jump, a repeated character later would reference a stale
+        # (too-early) position, causing `left` to move backward -- wrong!
         char_index[char] = right
         max_length = max(max_length, right - left + 1)
 
@@ -664,6 +690,10 @@ Answer: 3
 from collections import defaultdict
 
 def lengthOfLongestSubstringKDistinct(s: str, k: int) -> int:
+    # Why `k == 0`?
+    # With zero distinct characters allowed, no non-empty substring is valid.
+    # Without this guard, the while-loop would shrink forever on any non-empty
+    # window, making `left` overshoot `right` and producing garbage results.
     if k == 0:
         return 0
 
@@ -737,6 +767,11 @@ def characterReplacement(s: str, k: int) -> int:
 
     for right in range(len(s)):
         char_count[s[right]] += 1
+        # Why update `max_count` immediately after adding?
+        # `max_count` tracks the highest frequency of any single character in
+        # the current window. We use it to compute how many replacements are
+        # needed. If we skip this update, `max_count` lags behind and we may
+        # fail to recognize a newly valid (longer) window.
         max_count = max(max_count, char_count[s[right]])
 
         # Window invalid if we need more than k replacements.
@@ -786,6 +821,9 @@ def longestOnes(nums: list[int], k: int) -> int:
 
     for right in range(len(nums)):
         # Add nums[right]
+        # Why `nums[right] == 0`?
+        # We only count zeros because they represent flips. A 1 costs nothing
+        # and can always be included; only 0s consume our flip budget.
         if nums[right] == 0:
             zeros += 1
 
@@ -794,8 +832,9 @@ def longestOnes(nums: list[int], k: int) -> int:
         # AT MOST k zeros. Having exactly k flipped zeros is valid.
         # We only shrink when we've used MORE flips than allowed.
         while zeros > k:
-            # Only decrement zeros if the element leaving is a 0.
-            # Removing a 1 doesn't change our flip count.
+            # Why `if nums[left] == 0: zeros -= 1` before `left += 1`?
+            # Removing a 1 from the left doesn't free up a flip slot.
+            # Only when a 0 leaves the window does our flip count decrease.
             if nums[left] == 0:
                 zeros -= 1
             left += 1
@@ -850,6 +889,10 @@ def minSubArrayLen(target: int, nums: list[int]) -> int:
         # This is the opposite of "longest" problems where we shrink when
         # INVALID to restore validity.
         while current_sum >= target:
+            # Why record `min_length` BEFORE shrinking?
+            # At this moment the window [left, right] is valid. If we shrink
+            # first and then record, we'd miss this valid window entirely.
+            # The update must precede the removal of arr[left].
             min_length = min(min_length, right - left + 1)
             current_sum -= nums[left]
             left += 1
@@ -893,10 +936,18 @@ Answer: 2
 from collections import Counter
 
 def minWindow(s: str, t: str) -> str:
+    # Why `not t or not s`?
+    # An empty target t means every window matches (ambiguous), and an empty
+    # s means no window exists. Both are handled as "no valid window" to
+    # avoid dividing by zero or iterating over empty strings.
     if not t or not s:
         return ""
 
     t_count = Counter(t)
+    # Why `len(t_count)` and not `len(t)`?
+    # We care about unique characters, not total characters. If t = "AAB",
+    # we need A (count 2) and B (count 1) -- that's 2 unique chars, not 3.
+    # `formed` tracks how many unique chars have met their target frequency.
     required = len(t_count)  # Unique characters needed
 
     left = 0
@@ -1002,16 +1053,32 @@ def subarraysWithKDistinct(nums: list[int], k: int) -> int:
         distinct = 0
 
         for right in range(len(nums)):
+            # Why check `count[nums[right]] == 0` BEFORE incrementing?
+            # If the count is 0, this element isn't in the window yet.
+            # Adding it will introduce a new distinct value, so we increment
+            # `distinct` first. After the increment, the count becomes 1.
             if count[nums[right]] == 0:
                 distinct += 1
             count[nums[right]] += 1
 
+            # Why `distinct > k` and not `distinct >= k`?
+            # "At most k" means k distinct values are still valid. We only
+            # shrink when we have strictly MORE than k distinct values.
             while distinct > k:
                 count[nums[left]] -= 1
+                # Why check `count[nums[left]] == 0` AFTER decrementing?
+                # Only when the count drops to exactly 0 has this element
+                # been fully removed from the window. Until then, duplicates
+                # remain and the distinct count must not change.
                 if count[nums[left]] == 0:
                     distinct -= 1
                 left += 1
 
+            # Why `right - left + 1`?
+            # Every subarray ending at `right` with start index in
+            # [left, right] is a sub-window of our valid window, so it
+            # also has at most k distinct values. There are right-left+1
+            # such start positions (both endpoints inclusive).
             result += right - left + 1
 
         return result
@@ -1067,10 +1134,19 @@ def numberOfSubarrays(nums: list[int], k: int) -> int:
         result = 0
 
         for right in range(len(nums)):
+            # Why `nums[right] % 2 == 1`?
+            # Odd numbers are what we're counting. Even numbers don't affect
+            # our budget, so we skip them. Only odds consume a slot in k.
             if nums[right] % 2 == 1:
                 odds += 1
 
+            # Why `odds > k` and not `odds >= k`?
+            # At most k odds are allowed. Having exactly k is valid.
+            # We shrink only when we've exceeded the budget.
             while odds > k:
+                # Why `if nums[left] % 2 == 1: odds -= 1` before `left += 1`?
+                # Only an odd number leaving the window reduces the count.
+                # An even number leaving costs nothing from our budget.
                 if nums[left] % 2 == 1:
                     odds -= 1
                 left += 1
@@ -1105,6 +1181,11 @@ def numSubarraysWithSum(nums: list[int], goal: int) -> int:
         for right in range(len(nums)):
             current_sum += nums[right]
 
+            # Why `current_sum > goal` and not `>= goal`?
+            # "At most goal" means a sum equal to `goal` is valid.
+            # We only shrink when the sum EXCEEDS the allowed maximum.
+            # (This works here because nums is binary -- all 0s and 1s --
+            # so the sum changes monotonically as the window grows.)
             while current_sum > goal:
                 current_sum -= nums[left]
                 left += 1
@@ -1153,6 +1234,10 @@ def numSubarraysWithSum_prefix(nums: list[int], goal: int) -> int:
 from collections import Counter
 
 def checkInclusion(s1: str, s2: str) -> bool:
+    # Why `len(s1) > len(s2)`?
+    # A permutation of s1 cannot fit inside s2 if s1 is longer.
+    # Without this guard we'd iterate over an empty range and always return
+    # False anyway, but the early exit makes the intent explicit.
     if len(s1) > len(s2):
         return False
 
@@ -1166,20 +1251,41 @@ def checkInclusion(s1: str, s2: str) -> bool:
         char = s2[i]
         window_count[char] += 1
 
+        # Why `window_count[char] == s1_count[char]`?
+        # At the exact moment the window count REACHES the required count,
+        # this character is satisfied. Any further additions would over-supply
+        # it (handled by the elif below), so we count the match exactly once.
         if char in s1_count and window_count[char] == s1_count[char]:
             formed += 1
+        # Why `== s1_count[char] + 1`?
+        # The window now has ONE MORE than required for this character.
+        # It just crossed from "satisfied" to "over-supplied", so we
+        # decrement `formed` to reflect the lost match.
         elif char in s1_count and window_count[char] == s1_count[char] + 1:
             formed -= 1  # We now have too many
 
         # Remove s2[i - len(s1)] if window is too large
+        # Why `i >= len(s1)` and not `i > len(s1)`?
+        # When i == len(s1), the window spans [0, len(s1)], which is one
+        # element too large (size len(s1)+1). We must remove index 0 now.
         if i >= len(s1):
             left_char = s2[i - len(s1)]
+            # Why check `== s1_count[left_char]` BEFORE decrementing?
+            # The count is currently exactly right (matched). Removing one
+            # will break the match, so we decrement `formed` first.
             if left_char in s1_count and window_count[left_char] == s1_count[left_char]:
                 formed -= 1
+            # Why `== s1_count[left_char] + 1` here?
+            # The window had one too many of this char (over-supplied).
+            # Removing one brings it back to exactly the required count --
+            # a match is restored, so we increment `formed`.
             elif left_char in s1_count and window_count[left_char] == s1_count[left_char] + 1:
                 formed += 1  # We had too many, now correct
             window_count[left_char] -= 1
 
+        # Why `formed == required`?
+        # Every unique character in s1 has exactly the right frequency in
+        # the current window. This is precisely the definition of a permutation.
         if formed == required:
             return True
 
@@ -1190,12 +1296,18 @@ def checkInclusion(s1: str, s2: str) -> bool:
 
 ```python
 def checkInclusion_simple(s1: str, s2: str) -> bool:
+    # Why `len(s1) > len(s2)` again here?
+    # Same guard as in the main version: permutation cannot fit, fail fast.
     if len(s1) > len(s2):
         return False
 
     s1_count = Counter(s1)
     window_count = Counter(s2[:len(s1)])
 
+    # Why check the first window before the loop?
+    # The loop starts at index len(s1) and slides the window forward.
+    # The initial window [0, len(s1)-1] is never checked inside the loop,
+    # so we must check it here or we'd miss it entirely.
     if window_count == s1_count:
         return True
 
@@ -1205,6 +1317,10 @@ def checkInclusion_simple(s1: str, s2: str) -> bool:
         # Remove old char
         old_char = s2[i - len(s1)]
         window_count[old_char] -= 1
+        # Why `del window_count[old_char]` when count reaches 0?
+        # Counter equality checks consider {a:1, b:0} != {a:1}.
+        # Leaving zero-count keys causes false negatives when comparing
+        # with s1_count, so we remove them to keep the dict in canonical form.
         if window_count[old_char] == 0:
             del window_count[old_char]
 
@@ -1688,3 +1804,54 @@ def exactly_k(k):
 6. Try LC 992 for the "exactly k" trick
 
 Good luck with your interview preparation!
+
+---
+
+## Appendix: Conditional Quick Reference
+
+This table lists every key condition used in this handbook, its plain-English meaning, and the intuition behind it.
+
+### A. Window Validity & Shrink Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `while not is_valid(window_state)` | Keep shrinking until the window obeys the constraint | One removal may not be enough; `while` ensures full restoration before recording the result |
+| `while distinct > k` | The window has more unique characters than allowed | Strict `>` lets exactly k pass; shrinking removes elements from the left until we're back within budget |
+| `while zeros > k` | More zeros have been flipped than the budget allows | Each `left` step potentially frees one flip slot; we loop until we're within k flips |
+| `while current_sum >= target` (shortest) | The window sum is still valid — keep shrinking to find a shorter answer | For "shortest", validity triggers shrinking (opposite of "longest"); we record length before each shrink |
+| `while current_sum > goal` (count) | Sum exceeds the "at most" ceiling | `>` not `>=` because equality is still a valid window for counting subarrays |
+| `while odds > k` | More odd numbers in the window than the budget | Strict `>` keeps windows with exactly k odds valid; shrink only on over-budget |
+| `window_size - max_count > k` (`if`, not `while`) | More replacements needed than k allows | Only one shrink needed because the window grew by exactly one; using `if` preserves the high-water mark |
+| `while window_state > k` in `at_most` | Generic "at most k" shrink | Shrink until the tracked property is back within the allowed limit |
+
+### B. Frequency / Count Tracking Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if count[elem] == 0` before `count[elem] += 1` then `distinct += 1` | Element is new to the window | Checking before the increment catches the exact moment a new unique value enters; avoids double-counting |
+| `if count[elem] == 0` after `count[elem] -= 1` then `distinct -= 1` | Element has been fully removed from the window | Checking after the decrement catches the exact moment the last copy leaves; distinct count drops by one |
+| `if window_count[old_char] == 0: del window_count[old_char]` | Zero-count key must be purged before equality check | Python's Counter treats `{a:1, b:0}` as unequal to `{a:1}`; deleting zeros keeps the dict in canonical form |
+| `if p_count[char] == 0: matches += 1` | Window has now exactly satisfied the required count for this character | Only fire at the exact crossing point (debt reaches 0); `>=` would double-count earlier satisfactions |
+| `if p_count[old_char] == 0: matches -= 1` before restoring | Character was perfectly matched; removing one copy breaks the match | We must decrement before incrementing back, preserving the correct moment the match is lost |
+| `if char in t_count and window_count[char] == t_count[char]: formed += 1` | The window has just met the required frequency for this character | `==` not `>=` ensures we count the transition exactly once, avoiding inflation of `formed` |
+| `if left_char in t_count and window_count[left_char] < t_count[left_char]: formed -= 1` | A required character has dropped below its needed frequency | `<` detects the precise moment we lose a character's match when shrinking |
+
+### C. Result Update Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `result = max(result, right - left + 1)` after shrink loop | Window is valid; record if it's the longest seen | The `while` loop above guarantees validity at this point, so this is always a safe update |
+| `min_length = min(min_length, right - left + 1)` BEFORE shrinking | Window is currently valid; record it before making it smaller | For "shortest" problems we record then shrink — reversing the order would miss this candidate |
+| `result += right - left + 1` (count subarrays) | Every subarray ending at `right` with start in `[left, right]` is valid | Sub-windows of a valid window are also valid; there are exactly `right - left + 1` such subarrays |
+| `if i >= k - 1: result.append(nums[dq[0]])` | The first complete window of size k ends at index k-1 | Starting output at k-1 (not k) captures the result for the very first full window |
+| `return min_length if min_length != float('inf') else 0` | If no valid window was ever found, return 0 | `float('inf')` is the sentinel for "never updated"; the ternary converts it to the required "not found" value |
+
+### D. Edge Case & Termination Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if n < k: return 0` / `return None` | Array too short to form even one window | Prevents `arr[:k]` from silently building a shorter-than-k window and producing a garbage result |
+| `if k < 0: return 0` in `at_most` | Called with a negative limit (e.g., `atMost(-1)` from `exactly(0)`) | Without this guard the shrink loop runs forever because any non-negative state exceeds a negative target |
+| `if k == 0: return 0` (distinct version) | Zero distinct characters means no non-empty window is valid | Prevents infinite shrinking and makes the intent explicit |
+| `if not t or not s: return ""` | Empty target or empty source — no meaningful window to search | Avoids division-by-zero-style errors from `len(t_count) == 0` and keeps `required` well-defined |
+| `if char in char_index and char_index[char] >= left` | Duplicate is inside the current window (not behind it) | The `>= left` guard prevents `left` from moving backward to a stale index that was already evicted |

@@ -485,11 +485,19 @@ def rob(nums: list[int]) -> int:
 
     # dp[i] = max money from first i houses
     dp = [0] * len(nums)
+    # Why nums[0]? With only one house, the best we can do is rob it.
     dp[0] = nums[0]
+    # Why max(nums[0], nums[1])? With two houses we can only rob one
+    # (they're adjacent), so we pick whichever is worth more.
     dp[1] = max(nums[0], nums[1])
 
     for i in range(2, len(nums)):
-        # Either rob house i or don't
+        # Why max(dp[i-1], dp[i-2] + nums[i])?
+        # Two choices: skip house i and keep the best from i-1 houses
+        # (dp[i-1]), OR rob house i and add its value to the best from
+        # i-2 houses (dp[i-2] + nums[i]). We can't use dp[i-1] + nums[i]
+        # because house i-1 and house i are adjacent -- robbing both
+        # triggers the alarm.
         dp[i] = max(dp[i-1], dp[i-2] + nums[i])
 
     return dp[-1]
@@ -536,13 +544,24 @@ def rob(nums: list[int]) -> int:
 ```python
 def lengthOfLIS(nums: list[int]) -> int:
     # dp[i] = length of LIS ending at index i
+    # Why initialize to 1? Every single element is an increasing
+    # subsequence of length 1 by itself.
     dp = [1] * len(nums)
 
     for i in range(1, len(nums)):
         for j in range(i):
+            # Why nums[j] < nums[i] (strictly less than)?
+            # We want a STRICTLY increasing subsequence. If nums[j] == nums[i],
+            # appending nums[i] after nums[j] would not be strictly increasing.
+            # Example: [2, 2] — we cannot say LIS = 2; it's still 1.
+            # Why dp[i] = max(dp[i], dp[j] + 1)?
+            # dp[j] + 1 means "extend the LIS ending at j by adding nums[i]".
+            # We take the max over all valid j to find the longest such extension.
             if nums[j] < nums[i]:
                 dp[i] = max(dp[i], dp[j] + 1)
 
+    # Why max(dp) and not dp[-1]? The longest increasing subsequence can
+    # END at any index, not necessarily the last one.
     return max(dp)
 ```
 
@@ -577,10 +596,18 @@ def lengthOfLIS_optimized(nums: list[int]) -> int:
 ```python
 def uniquePaths(m: int, n: int) -> int:
     # dp[i][j] = number of paths to cell (i, j)
+    # Why initialize to 1? Every cell in the first row and first column
+    # has exactly one path to it: travel straight right or straight down.
+    # Initializing the entire grid to 1 handles these base cases for free.
     dp = [[1] * n for _ in range(m)]
 
+    # Why start both loops at 1? Row 0 and column 0 are already correct (all 1s).
+    # Interior cells receive contributions from both above (dp[i-1][j])
+    # and left (dp[i][j-1]), which are always valid references since i>=1 and j>=1.
     for i in range(1, m):
         for j in range(1, n):
+            # Why sum of above and left? You can only move right or down,
+            # so every path to (i,j) came from either (i-1,j) or (i,j-1).
             dp[i][j] = dp[i-1][j] + dp[i][j-1]
 
     return dp[m-1][n-1]
@@ -606,23 +633,32 @@ def uniquePaths_optimized(m: int, n: int) -> int:
 def uniquePathsWithObstacles(obstacleGrid: list[list[int]]) -> int:
     m, n = len(obstacleGrid), len(obstacleGrid[0])
 
+    # Why return 0 immediately? If the start cell is an obstacle,
+    # no path can even begin, so the answer is 0.
     if obstacleGrid[0][0] == 1:
         return 0
 
     dp = [[0] * n for _ in range(m)]
+    # Why dp[0][0] = 1? There is exactly one way to "be" at the start.
     dp[0][0] = 1
 
-    # First column
+    # First column: only reachable from directly above.
+    # Why propagate dp[i-1][0]? If the cell above was reachable (non-zero)
+    # and there's no obstacle here, this cell inherits that count.
+    # If there IS an obstacle, zero paths reach here OR any cell below it.
     for i in range(1, m):
         dp[i][0] = dp[i-1][0] if obstacleGrid[i][0] == 0 else 0
 
-    # First row
+    # First row: only reachable from directly to the left. Same logic applies.
     for j in range(1, n):
         dp[0][j] = dp[0][j-1] if obstacleGrid[0][j] == 0 else 0
 
     # Fill rest
     for i in range(1, m):
         for j in range(1, n):
+            # Why only add when obstacleGrid[i][j] == 0?
+            # An obstacle blocks the cell entirely -- no path can pass through it,
+            # so its path count must stay 0.
             if obstacleGrid[i][j] == 0:
                 dp[i][j] = dp[i-1][j] + dp[i][j-1]
 
@@ -640,19 +676,25 @@ def minPathSum(grid: list[list[int]]) -> int:
     m, n = len(grid), len(grid[0])
     dp = [[0] * n for _ in range(m)]
 
+    # Why grid[0][0]? The starting cell's minimum cost is just itself;
+    # there is no path leading into it.
     dp[0][0] = grid[0][0]
 
-    # First column
+    # First column: only reachable from above, so cost accumulates downward.
+    # Why cumulative sum? You MUST pass through every cell above to reach here.
     for i in range(1, m):
         dp[i][0] = dp[i-1][0] + grid[i][0]
 
-    # First row
+    # First row: only reachable from the left, so cost accumulates rightward.
     for j in range(1, n):
         dp[0][j] = dp[0][j-1] + grid[0][j]
 
     # Fill rest
     for i in range(1, m):
         for j in range(1, n):
+            # Why min of above and left? We can arrive from (i-1,j) or (i,j-1).
+            # We pick whichever arrival path was cheaper, then add the current
+            # cell's cost because we must step on it regardless.
             dp[i][j] = min(dp[i-1][j], dp[i][j-1]) + grid[i][j]
 
     return dp[m-1][n-1]
@@ -668,12 +710,21 @@ def minPathSum(grid: list[list[int]]) -> int:
 def minimumTotal(triangle: list[list[int]]) -> int:
     # Bottom-up approach: start from bottom row
     n = len(triangle)
+    # Why copy the bottom row? The bottom row values are the base cases --
+    # they are already the minimum path sums for single-element paths.
     dp = triangle[-1][:]  # Copy bottom row
 
+    # Why iterate from n-2 down to 0? We process rows from second-to-last
+    # up to the apex, using already-computed values from the row below.
     for i in range(n - 2, -1, -1):
         for j in range(i + 1):
+            # Why min(dp[j], dp[j+1])? From position j in row i, we can
+            # step to either j or j+1 in the next row. We pick the cheaper
+            # option and add the current cell's value.
             dp[j] = triangle[i][j] + min(dp[j], dp[j + 1])
 
+    # Why dp[0]? After processing all rows, dp[0] holds the min path sum
+    # from the apex (row 0) to any element in the bottom row.
     return dp[0]
 ```
 
@@ -696,12 +747,23 @@ def canPartition(nums: list[int]) -> bool:
     target = total // 2
 
     # dp[i] = True if sum i is achievable
+    # Why (target + 1) slots? We need to track achievability for sums
+    # 0 through target inclusive, requiring target + 1 entries.
     dp = [False] * (target + 1)
+    # Why dp[0] = True? A sum of 0 is always achievable by selecting no elements.
+    # This is the base case that "seeds" all future achievable sums.
     dp[0] = True
 
     for num in nums:
-        # Traverse backwards for 0/1 knapsack
+        # Why traverse backwards (target down to num)?
+        # Each number can be used at most once (0/1 knapsack). Going backwards
+        # ensures dp[j - num] still reflects the state BEFORE num was considered,
+        # preventing num from being counted more than once.
+        # Why stop at num (i.e., range starts with target and ends just before num-1)?
+        # For j < num, num cannot contribute to sum j, so dp[j] stays unchanged.
         for j in range(target, num - 1, -1):
+            # Why dp[j] or dp[j - num]? Keep achievability from not using num
+            # (dp[j]), or gain achievability by using num to reach j from j-num.
             dp[j] = dp[j] or dp[j - num]
 
     return dp[target]
@@ -717,18 +779,28 @@ def canPartition(nums: list[int]) -> bool:
 def findTargetSumWays(nums: list[int], target: int) -> int:
     total = sum(nums)
 
-    # If target not achievable
+    # Why (total + target) % 2 check? If the positive subset sum P and
+    # negative subset sum N satisfy P - N = target and P + N = total,
+    # then P = (total + target) / 2. If this is not an integer, no solution exists.
+    # Why abs(target) > total? The target cannot exceed the total sum in magnitude.
     if (total + target) % 2 or abs(target) > total:
         return 0
 
     # Transform: find subset with sum = (total + target) / 2
     subset_sum = (total + target) // 2
 
+    # dp[j] = number of ways to achieve sum j
     dp = [0] * (subset_sum + 1)
+    # Why dp[0] = 1? There is exactly one way to form sum 0: select nothing.
     dp[0] = 1
 
     for num in nums:
+        # Why traverse backwards? Same 0/1 knapsack reason: each num can
+        # be used at most once. Backwards traversal ensures dp[j - num] is
+        # from the previous iteration (before num was added).
         for j in range(subset_sum, num - 1, -1):
+            # Why +=? We accumulate the number of new ways to form sum j
+            # by using num: every way to reach j-num becomes a way to reach j.
             dp[j] += dp[j - num]
 
     return dp[subset_sum]
@@ -747,15 +819,21 @@ def lastStoneWeightII(stones: list[int]) -> int:
     target = total // 2
 
     dp = [False] * (target + 1)
+    # Why dp[0] = True? A subset sum of 0 is always reachable (empty subset).
     dp[0] = True
 
     for stone in stones:
+        # Why backwards? 0/1 knapsack: each stone used at most once.
         for j in range(target, stone - 1, -1):
             dp[j] = dp[j] or dp[j - stone]
 
     # Find largest achievable sum <= target
+    # Why iterate from target down to 0? We want the largest achievable sum
+    # that is still <= target (i.e., <= total/2) to minimize |sum1 - sum2|.
     for j in range(target, -1, -1):
         if dp[j]:
+            # Why total - 2 * j? If one group sums to j, the other sums to
+            # total - j. Their difference is (total - j) - j = total - 2*j.
             return total - 2 * j
 
     return total
@@ -774,14 +852,28 @@ def lastStoneWeightII(stones: list[int]) -> int:
 ```python
 def coinChange(coins: list[int], amount: int) -> int:
     # dp[i] = min coins to make amount i
+    # Why float('inf') as initial value? We use infinity as a sentinel for
+    # "not yet reachable". If dp[i] stays infinity after filling, amount i
+    # cannot be formed with the given coins.
     dp = [float('inf')] * (amount + 1)
+    # Why dp[0] = 0? Zero coins are needed to make amount 0 -- the empty
+    # selection. This seeds all future dp values correctly.
     dp[0] = 0
 
     for i in range(1, amount + 1):
         for coin in coins:
+            # Why coin <= i? We can only subtract coin from i if it fits.
+            # Using a coin worth more than the current amount i would give
+            # a negative index dp[i - coin], which is invalid.
             if coin <= i:
+                # Why min(dp[i], dp[i - coin] + 1)?
+                # dp[i - coin] is the fewest coins needed for (amount - coin).
+                # Adding 1 accounts for using this coin. We take the min
+                # over all coins to find the most efficient combination.
                 dp[i] = min(dp[i], dp[i - coin] + 1)
 
+    # Why check != float('inf')? If dp[amount] is still infinity, it means
+    # no combination of coins can form the exact amount, so return -1.
     return dp[amount] if dp[amount] != float('inf') else -1
 ```
 
@@ -795,10 +887,20 @@ def coinChange(coins: list[int], amount: int) -> int:
 def change(amount: int, coins: list[int]) -> int:
     # dp[i] = number of ways to make amount i
     dp = [0] * (amount + 1)
+    # Why dp[0] = 1? There is exactly one way to make amount 0: use no coins.
+    # This base case is essential -- without it, no combination would ever count.
     dp[0] = 1
 
-    # Process coins one by one (to avoid counting permutations)
+    # Why iterate over coins in the outer loop?
+    # Placing coins in the outer loop ensures we count COMBINATIONS (order doesn't
+    # matter). If we put amounts in the outer loop instead, we'd count PERMUTATIONS
+    # (e.g., [1,2] and [2,1] would be counted separately). Outer-coin order means
+    # each coin is "added" to the solution space one at a time.
     for coin in coins:
+        # Why start at coin (forward iteration)? This is UNBOUNDED knapsack:
+        # each coin can be used multiple times. Forward iteration is safe because
+        # reusing dp[i - coin] (already updated in this pass) is intentional --
+        # it means the same coin can be selected again.
         for i in range(coin, amount + 1):
             dp[i] += dp[i - coin]
 
@@ -813,12 +915,20 @@ def change(amount: int, coins: list[int]) -> int:
 
 ```python
 def numSquares(n: int) -> int:
+    # Why float('inf') as initial value? Signals "not yet computed".
+    # Any achievable value will overwrite it via the min update.
     dp = [float('inf')] * (n + 1)
+    # Why dp[0] = 0? Zero perfect squares are needed to sum to 0.
     dp[0] = 0
 
     for i in range(1, n + 1):
         j = 1
+        # Why j * j <= i? We only consider perfect squares that are <= i.
+        # A perfect square larger than i would produce a negative index,
+        # and subtracting it makes no sense (we'd overshoot the target).
         while j * j <= i:
+            # Why dp[i - j*j] + 1? dp[i - j*j] is the fewest squares needed
+            # for the remainder after using j^2 once. Adding 1 counts j^2 itself.
             dp[i] = min(dp[i], dp[i - j * j] + 1)
             j += 1
 
@@ -837,11 +947,21 @@ def wordBreak(s: str, wordDict: list[str]) -> bool:
     n = len(s)
 
     # dp[i] = True if s[:i] can be segmented
+    # Why (n + 1) slots? dp[0] is the base case for the empty prefix.
+    # We need entries for lengths 0 through n.
     dp = [False] * (n + 1)
+    # Why dp[0] = True? The empty string can always be "segmented" trivially.
+    # This seeds the chain: if dp[j] is True and s[j:i] is a word, then dp[i] = True.
     dp[0] = True
 
     for i in range(1, n + 1):
         for j in range(i):
+            # Why dp[j] and s[j:i] in word_set?
+            # dp[j] means s[:j] is already validly segmented.
+            # s[j:i] in word_set means the remaining substring is a known word.
+            # Together they confirm s[:i] can be fully segmented.
+            # Why break? Once we find one valid split, dp[i] is True --
+            # no need to check further splits for i.
             if dp[j] and s[j:i] in word_set:
                 dp[i] = True
                 break
@@ -862,13 +982,26 @@ def wordBreak(s: str, wordDict: list[str]) -> bool:
 ```python
 def longestCommonSubsequence(text1: str, text2: str) -> int:
     m, n = len(text1), len(text2)
+    # Why (m+1) x (n+1)? Row 0 = empty prefix of text1, col 0 = empty
+    # prefix of text2. LCS with any empty string is 0 (base case).
     dp = [[0] * (n + 1) for _ in range(m + 1)]
 
     for i in range(1, m + 1):
         for j in range(1, n + 1):
+            # Why text1[i-1] and text2[j-1]? dp is 1-indexed but strings
+            # are 0-indexed. dp[i][j] covers text1[0..i-1] and text2[0..j-1],
+            # so the "current" characters are at positions i-1 and j-1.
             if text1[i-1] == text2[j-1]:
+                # Why dp[i-1][j-1] + 1? Both characters match, so we extend
+                # the LCS of both strings with one fewer character by 1.
+                # Analogy: if the last letters of both strings match, the LCS
+                # = LCS of the trimmed strings + this matching character.
                 dp[i][j] = dp[i-1][j-1] + 1
             else:
+                # Why max(dp[i-1][j], dp[i][j-1])? No match means we must
+                # skip one character from either text1 or text2.
+                # dp[i-1][j] = skip text1's current char; dp[i][j-1] = skip text2's.
+                # We take whichever skip preserves the longer LCS.
                 dp[i][j] = max(dp[i-1][j], dp[i][j-1])
 
     return dp[m][n]
@@ -883,23 +1016,33 @@ def longestCommonSubsequence(text1: str, text2: str) -> int:
 ```python
 def minDistance(word1: str, word2: str) -> int:
     m, n = len(word1), len(word2)
+    # Why (m+1) x (n+1)? Row 0 = empty word1, col 0 = empty word2.
+    # These are the base cases: converting empty string to/from word2/word1.
     dp = [[0] * (n + 1) for _ in range(m + 1)]
 
-    # Base cases
+    # Why dp[i][0] = i? To convert word1[:i] to an empty string, we need
+    # i deletions (delete each of the i characters one by one).
     for i in range(m + 1):
         dp[i][0] = i
+    # Why dp[0][j] = j? To convert an empty string to word2[:j], we need
+    # j insertions (insert each of the j characters one by one).
     for j in range(n + 1):
         dp[0][j] = j
 
     for i in range(1, m + 1):
         for j in range(1, n + 1):
+            # Why word1[i-1] and word2[j-1]? Same 1-indexed dp / 0-indexed
+            # string offset as in LCS.
             if word1[i-1] == word2[j-1]:
+                # Why dp[i-1][j-1] (no +1)? Characters already match, so
+                # no operation is needed for this pair -- inherit the cost
+                # from the prefixes with both characters removed.
                 dp[i][j] = dp[i-1][j-1]
             else:
                 dp[i][j] = 1 + min(
-                    dp[i-1][j],    # Delete
-                    dp[i][j-1],    # Insert
-                    dp[i-1][j-1]   # Replace
+                    dp[i-1][j],    # Delete: remove word1[i-1], solve for word1[:i-1] -> word2[:j]
+                    dp[i][j-1],    # Insert: insert word2[j-1] into word1, solve for word1[:i] -> word2[:j-1]
+                    dp[i-1][j-1]   # Replace: swap word1[i-1] with word2[j-1], solve for word1[:i-1] -> word2[:j-1]
                 )
 
     return dp[m][n]
@@ -917,17 +1060,28 @@ def longestPalindromeSubseq(s: str) -> int:
     # dp[i][j] = LPS of s[i:j+1]
     dp = [[0] * n for _ in range(n)]
 
-    # Base case: single characters
+    # Why dp[i][i] = 1? Every single character is a palindrome of length 1.
+    # These are the diagonal base cases from which longer intervals are built.
     for i in range(n):
         dp[i][i] = 1
 
-    # Fill by increasing length
+    # Why iterate by increasing length starting from 2?
+    # To compute dp[i][j] we need dp[i+1][j-1] (shorter interval).
+    # Processing shorter intervals first guarantees that value exists.
+    # Length 1 (single chars) is already set above.
     for length in range(2, n + 1):
         for i in range(n - length + 1):
             j = i + length - 1
+            # Why s[i] == s[j]? If the outermost characters match, they can
+            # both be part of the palindrome, so we add 2 to the LPS of the
+            # inner substring s[i+1:j], represented by dp[i+1][j-1].
+            # Analogy: "abba" -- 'a'=='a', so LPS = LPS("bb") + 2 = 4.
             if s[i] == s[j]:
                 dp[i][j] = dp[i+1][j-1] + 2
             else:
+                # Why max(dp[i+1][j], dp[i][j-1])? Outer chars don't match,
+                # so we try skipping the left char (dp[i+1][j]) or the right
+                # char (dp[i][j-1]) and take whichever gives the longer result.
                 dp[i][j] = max(dp[i+1][j], dp[i][j-1])
 
     return dp[0][n-1]
@@ -948,18 +1102,24 @@ def longestPalindromeSubseq_lcs(s: str) -> int:
 ```python
 def numDistinct(s: str, t: str) -> int:
     m, n = len(s), len(t)
+    # Why (m+1) x (n+1)? Row 0 = empty prefix of s, col 0 = empty t.
     dp = [[0] * (n + 1) for _ in range(m + 1)]
 
-    # Empty t can be formed by any prefix of s
+    # Why dp[i][0] = 1? An empty t can always be matched exactly once by any
+    # prefix of s (by selecting nothing from s). This seeds the counting chain.
     for i in range(m + 1):
         dp[i][0] = 1
 
     for i in range(1, m + 1):
         for j in range(1, n + 1):
-            # Don't use s[i-1]
+            # Why always include dp[i-1][j]? We can choose NOT to use s[i-1]
+            # in any matching. All ways to match t[:j] using s[:i-1] still count.
             dp[i][j] = dp[i-1][j]
 
-            # Use s[i-1] if matches
+            # Why add dp[i-1][j-1] only when s[i-1] == t[j-1]?
+            # If s[i-1] matches t[j-1], we can also USE s[i-1] to match t[j-1].
+            # Every way to match t[:j-1] using s[:i-1] now yields a new match
+            # for t[:j] using s[:i] (with s[i-1] matched to t[j-1]).
             if s[i-1] == t[j-1]:
                 dp[i][j] += dp[i-1][j-1]
 
@@ -1006,11 +1166,18 @@ def maxProfit(prices: list[int]) -> int:
 **State machine approach:**
 ```python
 def maxProfit_dp(prices: list[int]) -> int:
+    # Why hold = -prices[0]? If we buy on day 0, we spend prices[0],
+    # so our profit is -prices[0]. This is the cost of holding stock.
     hold = -prices[0]  # Holding stock
+    # Why cash = 0? On day 0, if we don't buy, profit is 0.
     cash = 0           # Not holding stock
 
     for price in prices[1:]:
+        # Why max(hold, cash - price)? Either keep holding from yesterday,
+        # or buy today using the cash we have (cash - price).
         hold = max(hold, cash - price)
+        # Why max(cash, hold + price)? Either keep our cash from yesterday,
+        # or sell today (hold + price, where hold already accounts for buy cost).
         cash = max(cash, hold + price)
 
     return cash
@@ -1024,13 +1191,22 @@ def maxProfit_dp(prices: list[int]) -> int:
 
 ```python
 def maxProfit(prices: list[int]) -> int:
+    # Why -inf for buy states? We haven't bought yet; -inf ensures the first
+    # real price always overrides the initial sentinel.
     buy1 = buy2 = float('-inf')
+    # Why 0 for sell states? Before any sell occurs, profit is 0.
     sell1 = sell2 = 0
 
     for price in prices:
+        # Why -price for buy1? Buying costs price; profit after first buy = -price.
+        # max(buy1, -price): keep previous buy if it was cheaper, or buy today.
         buy1 = max(buy1, -price)
+        # Why buy1 + price for sell1? Sell today after the best first buy = buy1 + price.
         sell1 = max(sell1, buy1 + price)
+        # Why sell1 - price for buy2? Second buy profit = profit from first transaction
+        # minus the cost of buying again. sell1 carries the first-transaction gain.
         buy2 = max(buy2, sell1 - price)
+        # Why buy2 + price for sell2? Sell today after the best second buy.
         sell2 = max(sell2, buy2 + price)
 
     return sell2
@@ -1049,17 +1225,33 @@ def maxProfit(k: int, prices: list[int]) -> int:
 
     n = len(prices)
 
-    # If k >= n/2, unlimited transactions
+    # Why k >= n // 2 implies unlimited transactions?
+    # You can make at most n//2 profitable transactions (buy low, sell high)
+    # in n days. If k exceeds this, the k constraint is never binding,
+    # so we reduce to the unlimited-transaction problem.
     if k >= n // 2:
         return sum(max(0, prices[i] - prices[i-1]) for i in range(1, n))
 
     # dp[i][j] = max profit with at most i transactions on first j days
+    # Why (k+1) rows? We need rows 0..k; row 0 = zero transactions = 0 profit.
     dp = [[0] * n for _ in range(k + 1)]
 
     for i in range(1, k + 1):
+        # Why max_diff = -prices[0]? max_diff tracks max(dp[i-1][j] - prices[j]),
+        # the best "buy value" seen so far for the i-th transaction.
+        # Initializing with -prices[0] means we consider buying on day 0
+        # with zero profit from the previous (i-1) transactions.
         max_diff = -prices[0]
         for j in range(1, n):
+            # Why max(dp[i][j-1], prices[j] + max_diff)?
+            # dp[i][j-1] = don't sell today (carry forward).
+            # prices[j] + max_diff = sell today at prices[j], having bought
+            # at the optimal earlier point (captured in max_diff).
             dp[i][j] = max(dp[i][j-1], prices[j] + max_diff)
+            # Why update max_diff with dp[i-1][j] - prices[j]?
+            # dp[i-1][j] is the best profit from i-1 transactions up to day j.
+            # Subtracting prices[j] captures the net value of buying on day j
+            # after completing i-1 transactions. We keep the best such value seen.
             max_diff = max(max_diff, dp[i-1][j] - prices[j])
 
     return dp[k][n-1]
@@ -1101,17 +1293,31 @@ def maxProfit(prices: list[int]) -> int:
 
 ```python
 def maxCoins(nums: list[int]) -> int:
-    # Add 1s at boundaries
+    # Why add 1s at boundaries? When the first or last balloon is burst,
+    # its "neighbors" are the boundary sentinels. Using 1s means the sentinel
+    # multiplied in (nums[i] * nums[k] * nums[j]) doesn't inflate the score.
     nums = [1] + nums + [1]
     n = len(nums)
 
-    # dp[i][j] = max coins from bursting all balloons in (i, j)
+    # dp[i][j] = max coins from bursting all balloons in OPEN interval (i, j)
+    # (i and j are sentinel/boundary balloons, not burst themselves)
     dp = [[0] * n for _ in range(n)]
 
+    # Why length from 2 to n-1? The open interval (i,j) needs at least one
+    # balloon inside it (j > i+1), which means length >= 2. Length n-1 is
+    # the widest valid open interval using the original array.
     for length in range(2, n):  # length from 2 to n-1
         for i in range(n - length):
             j = i + length
+            # Why k is the LAST balloon to burst (not the first)?
+            # When k is burst last, its neighbors are exactly i and j (the
+            # boundaries), still intact. This avoids the shifting-neighbor
+            # problem that occurs when thinking about the first burst.
             for k in range(i + 1, j):  # k is last balloon to burst
+                # Why nums[i] * nums[k] * nums[j]? When k is the last to burst
+                # in (i,j), its left neighbor is i and right neighbor is j
+                # (all others in (i,j) are already gone). Score = product of
+                # three remaining neighbors.
                 dp[i][j] = max(dp[i][j],
                               dp[i][k] + dp[k][j] + nums[i] * nums[k] * nums[j])
 
@@ -1131,13 +1337,25 @@ def matrixChainOrder(dims: list[int]) -> int:
     n matrices: dims has n+1 elements
     """
     n = len(dims) - 1
+    # Why n x n? dp[i][j] = min cost to multiply matrices i through j.
+    # Diagonal (i==j) is 0 by default: multiplying one matrix costs nothing.
     dp = [[0] * n for _ in range(n)]
 
+    # Why start length at 2? Length 1 (single matrix) costs 0, already set.
+    # We need at least 2 matrices to have a multiplication to optimize.
     for length in range(2, n + 1):
         for i in range(n - length + 1):
             j = i + length - 1
+            # Why float('inf')? We want to minimize cost; infinity ensures
+            # any actual computed cost will overwrite the initial value.
             dp[i][j] = float('inf')
+            # Why k from i to j-1? k splits the chain into [i..k] and [k+1..j].
+            # Both halves must be non-empty, so k < j (range(i, j) is exclusive of j).
             for k in range(i, j):
+                # Why dims[i] * dims[k+1] * dims[j+1]? This is the cost of
+                # multiplying the two result matrices: left result is dims[i] x dims[k+1]
+                # and right result is dims[k+1] x dims[j+1].
+                # Their product costs dims[i] * dims[k+1] * dims[j+1] scalar multiplications.
                 cost = dp[i][k] + dp[k+1][j] + dims[i] * dims[k+1] * dims[j+1]
                 dp[i][j] = min(dp[i][j], cost)
 
@@ -1156,19 +1374,34 @@ def minCut(s: str) -> int:
 
     # Precompute: is_pal[i][j] = is s[i:j+1] palindrome?
     is_pal = [[False] * n for _ in range(n)]
+    # Why iterate i from n-1 down to 0? is_pal[i][j] depends on is_pal[i+1][j-1]
+    # (the inner substring). Processing from the right ensures the inner result
+    # is already computed when the outer one needs it.
     for i in range(n - 1, -1, -1):
         for j in range(i, n):
+            # Why s[i] == s[j] AND (j - i < 2 OR is_pal[i+1][j-1])?
+            # A substring is a palindrome if its outer characters match (s[i]==s[j])
+            # AND its inner part is also a palindrome.
+            # j - i < 2 handles base cases: single char (j==i) and two-char (j==i+1)
+            # substrings are palindromes as long as s[i]==s[j].
             if s[i] == s[j] and (j - i < 2 or is_pal[i+1][j-1]):
                 is_pal[i][j] = True
 
     # dp[i] = min cuts for s[0:i+1]
+    # Why list(range(n))? Worst case: cut every character individually,
+    # requiring i cuts for s[0:i+1] (i+1 single-char palindromes, i cuts).
     dp = list(range(n))  # Worst case: all single chars
 
     for i in range(n):
+        # Why dp[i] = 0 when is_pal[0][i]? If the whole prefix is already a
+        # palindrome, no cuts are needed at all.
         if is_pal[0][i]:
             dp[i] = 0
         else:
             for j in range(i):
+                # Why is_pal[j+1][i]? If s[j+1:i+1] is a palindrome, we can
+                # place one cut after position j, then dp[j] + 1 gives the
+                # total cuts: optimal cuts for s[0:j+1] plus one more cut.
                 if is_pal[j+1][i]:
                     dp[i] = min(dp[i], dp[j] + 1)
 
@@ -1187,10 +1420,18 @@ def minCut(s: str) -> int:
 
 ```python
 def climbStairs(n: int) -> int:
+    # Why return n when n <= 2? Base cases:
+    # n=1: one way (take 1 step). n=2: two ways (1+1 or 2). Both equal n.
     if n <= 2:
         return n
 
+    # Why prev2=1, prev1=2? These represent climbStairs(1)=1 and climbStairs(2)=2.
+    # We build from here using the recurrence: f(i) = f(i-1) + f(i-2).
     prev2, prev1 = 1, 2
+    # Why prev2 + prev1? To reach step i you either:
+    #   - took a 1-step from step i-1 (prev1 ways to reach i-1), OR
+    #   - took a 2-step from step i-2 (prev2 ways to reach i-2).
+    # Total = sum of both. This is identical to Fibonacci.
     for _ in range(3, n + 1):
         prev2, prev1 = prev1, prev2 + prev1
 
@@ -1205,21 +1446,33 @@ def climbStairs(n: int) -> int:
 
 ```python
 def numDecodings(s: str) -> int:
+    # Why return 0 if s[0] == '0'? A leading zero cannot be decoded --
+    # no letter maps to "0", and "0x" is not a valid two-digit code either.
     if not s or s[0] == '0':
         return 0
 
     n = len(s)
+    # dp[i] = number of ways to decode s[:i]
     dp = [0] * (n + 1)
+    # Why dp[0] = 1? The empty string has one decoding: decode nothing.
+    # This acts as the neutral seed for the recurrence.
     dp[0] = 1
+    # Why dp[1] = 1? s[0] != '0' (checked above), so the first character
+    # has exactly one valid single-digit decoding.
     dp[1] = 1
 
     for i in range(2, n + 1):
-        # Single digit
+        # Single digit decode: use s[i-1] alone.
+        # Why s[i-1] != '0'? '0' has no single-letter mapping (A=1..Z=26),
+        # so it cannot be decoded as a standalone digit.
         if s[i-1] != '0':
             dp[i] += dp[i-1]
 
-        # Two digits
+        # Two digit decode: use s[i-2:i] as a two-digit code.
         two_digit = int(s[i-2:i])
+        # Why 10 <= two_digit <= 26? Valid two-digit codes are 10 ("J") to
+        # 26 ("Z"). Values below 10 have a leading zero (invalid two-digit
+        # form), and values above 26 exceed the alphabet.
         if 10 <= two_digit <= 26:
             dp[i] += dp[i-2]
 
@@ -1297,8 +1550,14 @@ def solve(i):
 ```python
 from functools import lru_cache
 
+# Why @lru_cache? It automatically memoizes return values keyed by arguments.
+# The first time solve(i) is called, the result is computed and stored.
+# Subsequent calls with the same i instantly return the cached result,
+# turning O(2^n) exponential recursion into O(n) with O(n) space.
 @lru_cache(maxsize=None)
 def solve(i):
+    # Why i <= 1? Base cases: solve(0) = 0, solve(1) = 1 (Fibonacci seeds).
+    # Without these, the recursion would never terminate.
     if i <= 1:
         return i
     return solve(i-1) + solve(i-2)
@@ -1543,3 +1802,56 @@ for w in range(1, capacity + 1):
 6. Interval: 516, 312
 
 Good luck with your interview preparation!
+
+---
+
+## Appendix: Conditional Quick Reference
+
+This table lists every key condition used in this handbook, its plain-English meaning, and the intuition behind it.
+
+### A. Base Case & Initialization Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `dp[0] = 0` (Coin Change, Perfect Squares) | Zero coins / squares needed to make amount 0 | Seeds the counting chain; every larger amount is built from this base |
+| `dp[0] = 1` (Coin Change II, Target Sum, Word Break) | Exactly one way to achieve "nothing" (empty selection) | The empty set is always a valid solution; without this seed, no combinations would ever count |
+| `dp[0][0] = 1` (grid start) | One way to be at the starting cell | No predecessors exist; you simply start there |
+| `dp[i][0] = i` (Edit Distance) | Converting word1[:i] to empty string costs i deletions | You must delete each of the i characters one by one |
+| `dp[0][j] = j` (Edit Distance) | Converting empty string to word2[:j] costs j insertions | You must insert each of the j characters one by one |
+| `dp[i][i] = 1` (Palindrome Subsequence, Interval DP) | Every single character is a palindrome / base interval | Length-1 intervals need no splitting; they are solved directly |
+| `dp[1] = 1` (Fibonacci, Decode Ways) | The first element has exactly one way to be reached | The second base case; without it the recurrence for index 2 would produce a wrong value |
+| `dp[0] = nums[0]` (Max Subarray, House Robber) | Best answer for a single-element problem equals that element | There is no choice to make yet; the only element must be selected |
+
+### B. Transition Guard Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if coin <= i` (Coin Change) | The coin's value must not exceed the current amount | Looking up `dp[i - coin]` with a negative index is invalid; the coin simply cannot be used here |
+| `if weights[i-1] <= w` (0/1 Knapsack) | Item weight must fit within remaining capacity | You cannot physically place an item heavier than the remaining capacity |
+| `if nums[j] < nums[i]` (LIS) | Previous element must be strictly less than current | LIS requires STRICT increase; allowing equal values would mis-count [2, 2] as length 2 |
+| `if j * j <= i` (Perfect Squares) | Perfect square must not exceed the current target | Using a square larger than the target would produce a negative dp-index lookup |
+| `if dp[j] and s[j:i] in word_set` (Word Break) | Prefix up to j is already segmented AND remaining slice is a valid word | Both conditions together confirm a valid full segmentation up to i |
+| `if obstacleGrid[i][j] == 0` (Unique Paths II) | Cell must be obstacle-free to receive path counts | An obstacle blocks all paths; allowing counts to flow through would overcount |
+| `if s[i-1] == t[j-1]` (LCS, Edit Distance, Distinct Subsequences) | Current characters of both strings match | Only matching characters can extend a common subsequence or be matched without an operation |
+
+### C. Include / Exclude & Optimization Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `dp[i] = max(dp[i-1], dp[i-2] + nums[i])` (House Robber) | Skip house i, or rob it after skipping house i-1 | Adjacent houses share an alarm; robbing both triggers it, so we enforce a gap of at least 1 |
+| `dp[i][j] = max(dp[i-1][j], dp[i-1][j-w] + v)` (Knapsack) | Exclude item i, or include it and deduct its weight | `dp[i-1][j]` excludes item i; `dp[i-1][j-w] + v` includes it using the remaining capacity |
+| `dp[i][j] = dp[i-1][j-1] + 1` when chars match (LCS) | Extend the LCS of both shorter prefixes by 1 | The matching characters lock together, so we inherit the LCS of both trimmed strings and add 1 |
+| `dp[i][j] = max(dp[i-1][j], dp[i][j-1])` when no match (LCS) | Best LCS when we must skip one character | No matching here; try skipping either string's current character and take the better result |
+| `dp[i][j] = dp[i-1][j-1]` when chars match (Edit Distance) | No operation needed; inherit cost from both trimmed prefixes | Matching characters cost nothing; the edit distance equals that of the inner subproblems |
+| `dp[i][j] = 1 + min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])` (Edit Distance) | One operation (delete, insert, or replace) plus the best sub-result | Each of the three dp terms represents one edit type; +1 counts the operation just applied |
+| `dp[i][j] = dp[i+1][j-1] + 2` when s[i]==s[j] (Palindrome Subseq) | Matching outer chars extend the inner palindrome by 2 | Both boundary characters join the palindrome; inner LPS + 2 gives the new length |
+
+### D. Memoization & Termination Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if n <= 1: return n` (Fibonacci, Climbing Stairs) | Base cases: fib(0)=0, fib(1)=1; stairs(1)=1, stairs(2)=2 | Without these, the recursion has no floor and runs infinitely |
+| `@lru_cache(maxsize=None)` / `if (i,j) in memo` | Return precomputed result if this subproblem was solved before | Avoids exponential recomputation; same subproblems appear repeatedly (overlapping subproblems property) |
+| `if dp[amount] != float('inf')` (Coin Change) | Only return the computed value if the amount was reachable | Infinity as a sentinel means "no valid combination exists"; returning -1 signals impossibility |
+| `for w in range(capacity, weights[i]-1, -1)` (0/1 Knapsack 1D) | Backwards traversal prevents using the same item twice | Going forward, `dp[w - weight]` could already reflect the current item (added earlier in the same pass), effectively allowing reuse |
+| `for i in range(coin, amount+1)` (Coin Change II / Unbounded) | Forward traversal intentionally allows reusing the same coin | Unbounded knapsack permits repeated use; forward iteration means `dp[i - coin]` may already include this coin, which is correct |

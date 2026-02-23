@@ -1087,11 +1087,22 @@ def candy(ratings: list[int]) -> int:
 
     # Left to right: enforce left neighbor constraint
     for i in range(1, n):
+        # Why `ratings[i] > ratings[i - 1]` in the left-to-right pass?
+        # This checks whether the current child has a STRICTLY HIGHER rating
+        # than their LEFT neighbor. If so, they must receive at least one more
+        # candy than that neighbor. Equal ratings require no extra candy.
         if ratings[i] > ratings[i - 1]:
             candies[i] = candies[i - 1] + 1
 
     # Right to left: enforce right neighbor constraint
     for i in range(n - 2, -1, -1):
+        # Why a second pass right-to-left?
+        # The left pass only guarantees each child beats their left neighbor.
+        # A child who is higher-rated than their RIGHT neighbor also needs more
+        # candies — but that direction was not covered yet.
+        # Why max(candies[i], candies[i+1] + 1) instead of just assigning?
+        # We must not erase the constraint already established by the left pass.
+        # Taking the max keeps whichever constraint is stricter at this position.
         if ratings[i] > ratings[i + 1]:
             candies[i] = max(candies[i], candies[i + 1] + 1)
 
@@ -1135,12 +1146,22 @@ Verify [4,4]: people in front with h>=4: [5,0],[7,0],[5,2],[6,1] -> 4 people. Co
 **Solution:**
 ```python
 def reconstructQueue(people: list[list[int]]) -> list[list[int]]:
-    # Sort: tallest first, then by k ascending
+    # Why sort by (-height, k) — descending height, then ascending k?
+    # We must place taller people first. When a taller person is inserted,
+    # shorter people haven't been placed yet, so they won't affect the k-count
+    # of the taller person. If we inserted shorter people first, a later tall
+    # insertion would shift them and break their already-correct k values.
+    # Within equal heights, ascending k ensures position 0 is placed before 1,
+    # so each insert goes to an already-correct slot.
     people.sort(key=lambda x: (-x[0], x[1]))
 
     queue = []
     for person in people:
-        # Insert at position k
+        # Why insert at index person[1] (the k value)?
+        # At the time of insertion, every person already in the queue is at
+        # least as tall as the current person (we process tallest first).
+        # So inserting at position k places exactly k taller-or-equal people
+        # in front — satisfying the k constraint by construction.
         queue.insert(person[1], person)
 
     return queue
@@ -1384,6 +1405,234 @@ def maxNumber(nums1: list[int], nums2: list[int], k: int) -> list[int]:
 ```
 
 **Complexity:** Time O(k * (m + n + k)), Space O(m + n + k). The outer loop runs O(k) times, and each iteration does O(m + n) for subsequences and O(k) for merge.
+
+---
+
+### PATTERN 8: Partition Labels
+
+---
+
+#### Pattern 8A: Partition Labels
+
+**Problem:** LeetCode 763 - Partition string s into as many parts as possible so each letter appears in at most one part. Return the sizes of the parts.
+
+**Example:**
+```
+Input:  s = "ababcbacadefegdehijhklij"
+Output: [9, 7, 8]
+Explanation: "ababcbaca" | "defegde" | "hijhklij"
+```
+
+**Key Insight:** For each character, find the last index where it appears. Then scan left to right, tracking the farthest last-occurrence seen so far (`end`). When the current index equals `end`, we have found a partition — every character seen up to this point has its last occurrence at or before `end`, so nothing will "leak" into the next part.
+
+**Visual Trace:**
+```
+s = "ababcbacadefegdehijhklij"
+idx: 0123456789...
+
+Last occurrence: a=8, b=5, c=7, d=14, e=15, f=11, g=13, h=19, i=22, j=23, k=20, l=21
+
+i=0 ('a'): end = max(0, 8) = 8
+i=1 ('b'): end = max(8, 5) = 8
+...
+i=8 ('a'): end = max(8, 8) = 8, i == end -> partition! size = 8-0+1 = 9
+
+i=9 ('d'):  end = 14
+...
+i=15 ('e'): end = 15, i == end -> partition! size = 15-9+1 = 7
+
+i=16 ('h'): end = 19
+...
+i=23 ('j'): end = 23, i == end -> partition! size = 23-16+1 = 8
+
+Result: [9, 7, 8]
+```
+
+**Solution:**
+```python
+def partitionLabels(s: str) -> list[int]:
+    # Why store the LAST occurrence of each character?
+    # A partition can only end when every character seen so far has appeared
+    # for the last time — i.e., no character will appear again in a later part.
+    # The last occurrence tells us how far right we must extend the current part.
+    last = {c: i for i, c in enumerate(s)}
+
+    result = []
+    start = 0
+    end = 0
+
+    for i, c in enumerate(s):
+        # Why "end = max(end, last[c])"?
+        # Each new character may push the partition boundary further right
+        # because it must be fully contained in the current part.
+        # We take max to never shrink the boundary we have already committed to.
+        end = max(end, last[c])
+
+        # Why "i == end" signals a partition boundary?
+        # When i reaches end, we have processed every position through the
+        # farthest last-occurrence of any character seen since `start`.
+        # Nothing we've encountered will appear again after position end,
+        # so this is the earliest safe cut point.
+        if i == end:
+            result.append(i - start + 1)
+            start = i + 1
+
+    return result
+```
+
+**Complexity:** Time O(n), Space O(1) (at most 26 characters in `last`).
+
+---
+
+### PATTERN 9: Lemonade Change
+
+---
+
+#### Pattern 9A: Lemonade Change
+
+**Problem:** LeetCode 860 - Customers pay $5, $10, or $20 for a $5 lemonade. Return True if you can give every customer correct change.
+
+**Example:**
+```
+Input:  bills = [5, 5, 5, 10, 20]
+Output: True
+
+Input:  bills = [5, 5, 10, 10, 20]
+Output: False
+```
+
+**Key Insight:** You only ever need to give $5 or $10 as change. A $5 bill needs no change. A $10 bill requires one $5 in change. A $20 bill requires $15 in change — prefer $10 + $5 over three $5 bills, because $5 bills are more versatile (they can make change for both $10 and $20 bills). This "prefer large bills first when making change for $20" is the greedy choice.
+
+**Visual Trace:**
+```
+bills = [5, 5, 5, 10, 20]
+five=0, ten=0
+
+$5:  five=1, ten=0  (no change needed)
+$5:  five=2, ten=0
+$5:  five=3, ten=0
+$10: five=2, ten=1  (give $5 change)
+$20: prefer $10+$5: ten=0, five=1  (give $15 change)
+
+Result: True (always had change available)
+```
+
+**Solution:**
+```python
+def lemonadeChange(bills: list[int]) -> bool:
+    five = 0
+    ten = 0
+
+    for bill in bills:
+        # Why handle $5 first (no change needed)?
+        # A $5 payment always works — customer pays exact amount.
+        # Simply accumulate it as future change supply.
+        if bill == 5:
+            five += 1
+
+        # Why check `ten > 0` before giving $10 change for a $10 bill?
+        # We need exactly one $5 to make change. If we have no $5 bills,
+        # we cannot make change and must return False immediately.
+        elif bill == 10:
+            if five == 0:
+                return False
+            five -= 1
+            ten += 1
+
+        # Why prefer giving $10 + $5 over three $5 bills for a $20 bill?
+        # $5 bills are MORE versatile — they can make change for $10 bills
+        # AND $20 bills. $10 bills can only make change for $20 bills.
+        # Spending a $10 bill first preserves our precious $5 bills for
+        # future $10 payments. This is the key greedy insight.
+        else:  # bill == 20
+            if ten > 0 and five > 0:
+                # Why try $10 + $5 first?
+                # Using the $10 bill now saves $5 bills for more flexible use later.
+                ten -= 1
+                five -= 1
+            elif five >= 3:
+                # Why fall back to three $5 bills only if no $10 is available?
+                # We exhaust the less-versatile option first; only use all $5
+                # when we have no $10 to pair with.
+                five -= 3
+            else:
+                return False
+
+    return True
+```
+
+**Complexity:** Time O(n), Space O(1).
+
+---
+
+### PATTERN 10: Fractional Knapsack
+
+---
+
+#### Pattern 10A: Fractional Knapsack
+
+**Problem:** Given items with weights and values, and a knapsack of limited capacity, maximize total value. Unlike 0/1 knapsack, you can take fractions of items.
+
+**Example:**
+```
+Input:  items = [(60, 10), (100, 20), (120, 30)], capacity = 50
+Output: 240.0
+Explanation: Take all of item 0 (60), all of item 1 (100),
+             and 2/3 of item 2 (80) -> 60+100+80 = 240
+```
+
+**Key Insight:** Sort items by value-per-unit-weight (value/weight ratio) descending. Always take as much of the most valuable item as the remaining capacity allows. This greedy works because items are divisible — you can always fill any remaining space with the next best item without waste.
+
+**Visual Trace:**
+```
+items = [(60,10), (100,20), (120,30)], capacity = 50
+
+Value/weight ratios: item0=6.0, item1=5.0, item2=4.0
+
+Sorted by ratio: item0(6.0), item1(5.0), item2(4.0)
+
+Take item0: 10 <= 50, take all. value=60, remaining=40
+Take item1: 20 <= 40, take all. value=160, remaining=20
+Take item2: 30 > 20, take 20/30 fraction. value=160+80=240, remaining=0
+
+Answer: 240.0
+```
+
+**Solution:**
+```python
+def fractionalKnapsack(items: list[tuple], capacity: int) -> float:
+    # Why sort by value/weight ratio descending?
+    # At each step, taking the item with the highest value-per-unit-weight
+    # maximizes the value gained per unit of capacity consumed.
+    # This greedy choice is optimal because items are divisible — there is
+    # never a reason to take a less efficient item when a better one is available.
+    items.sort(key=lambda item: item[0] / item[1], reverse=True)
+
+    total_value = 0.0
+    remaining_capacity = capacity
+
+    for value, weight in items:
+        # Why "weight <= remaining_capacity" before taking the whole item?
+        # If the item fits entirely, we take all of it — no need to compute
+        # a fraction. This guard prevents us from taking more than the item
+        # weighs, which would be nonsensical.
+        if weight <= remaining_capacity:
+            # Take the entire item
+            total_value += value
+            remaining_capacity -= weight
+        else:
+            # Why take only a fraction here?
+            # The item is larger than what remains. Since fractions are allowed,
+            # we fill the rest of the knapsack with as much of this item as fits.
+            # The fraction is (remaining_capacity / weight) of the item's value.
+            fraction = remaining_capacity / weight
+            total_value += value * fraction
+            break  # Knapsack is now full
+
+    return total_value
+```
+
+**Complexity:** Time O(n log n) for sorting, Space O(1) extra.
 
 ---
 
@@ -1963,3 +2212,50 @@ return cost
 8. Wrap up with easy problems for speed: 455, 860, 1005
 
 Good luck with your interview preparation!
+
+---
+
+## Appendix: Conditional Quick Reference
+
+This table lists every key condition used in this handbook, its plain-English meaning, and the intuition behind it.
+
+### A. Reachability & Coverage Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if i > farthest: return False` (Jump Game) | Current index is beyond any reachable position | Once you have a gap no earlier jump can bridge, you are permanently stuck — no path exists to the end |
+| `if i == current_end` (Jump Game II) | Reached the boundary of the current BFS "level" | All positions reachable with k jumps have been explored; you must commit to the next jump now to move farther |
+| `if farthest == coverage: return -1` (Video Stitching) | No available clip extended our coverage | A gap exists that cannot be bridged — no future clip starts before the gap, so coverage is permanently stalled |
+| `while clips[i][0] <= coverage` (Video Stitching) | Clip starts at or before current coverage endpoint | Only clips that overlap with existing coverage can extend it; a clip that starts after the endpoint leaves a gap |
+| `if sum(gas) < sum(cost): return -1` (Gas Station) | Total fuel across all stations is less than total fuel needed | No matter where you start, the circuit will always end with a net deficit — a solution is mathematically impossible |
+| `end = max(end, last[c])` (Partition Labels) | Extend the partition boundary to include the current character's last occurrence | Every character must be fully contained in one part; if its last occurrence is further right, the boundary must move there |
+
+### B. Greedy Selection & Exchange Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `intervals.sort(key=lambda x: x[1])` (Non-overlapping / Arrows) | Sort intervals by end time | Picking the interval that ends earliest leaves the maximum room for future intervals — provable via exchange argument |
+| `if ratings[i] > ratings[i-1]` (Candy, left pass) | Current child has a strictly higher rating than their left neighbor | The child must receive at least one more candy than the left neighbor; equal ratings need no adjustment |
+| `if ratings[i] > ratings[i+1]` (Candy, right pass) | Current child has a strictly higher rating than their right neighbor | Left pass alone misses this constraint; the right pass fills it, and `max()` merges both without violating either |
+| `people.sort(key=lambda x: (-x[0], x[1]))` (Queue Reconstruction) | Sort by descending height, then ascending k | Taller people must be placed first so shorter insertions later do not disturb their k-count invariant |
+| `items.sort(key=lambda item: item[0]/item[1], reverse=True)` (Fractional Knapsack) | Sort items by value-per-weight ratio, most efficient first | Taking the most value-dense item first maximizes value per unit of capacity; works because fractions are allowed |
+| `return max(result, len(tasks))` (Task Scheduler) | Answer is at least the total number of tasks | When tasks are diverse enough to fill all cooldown gaps, no idle slots are needed and the schedule length equals task count |
+
+### C. Partition & Boundary Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if i == end` (Partition Labels) | Current index has reached the farthest last-occurrence of any character seen so far | Every character encountered since `start` has its final appearance at or before `i` — the partition is safe to cut here |
+| `if i == current_end` (Jump Game II) | We have exhausted all positions reachable within the current jump count | This is the BFS level boundary; advancing past it requires taking another jump and setting the new boundary to `farthest` |
+| `if intervals[i][0] > arrow_pos` (Min Arrows) | Balloon starts strictly after the current arrow's position | Since the arrow is at `arrow_pos` and the balloon begins after it, the arrow cannot burst this balloon — a new one is required |
+| `if intervals[i][0] <= merged[-1][1]` (Merge Intervals) | Next interval overlaps or touches the last merged interval | When start <= current end, the intervals share at least a boundary point and must be merged into one continuous interval |
+| `if i == end: result.append(i - start + 1)` (Partition Labels) | Emit partition size and reset start pointer | The current part is complete; recording its size and resetting `start` to `i+1` begins tracking the next part |
+
+### D. Feasibility & Early Exit Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if sum(gas) < sum(cost): return -1` (Gas Station) | Global fuel deficit makes a circuit impossible | If total gas < total cost, the net balance for the entire circuit is negative — no starting point can compensate |
+| `if tank < 0: start = i+1; tank = 0` (Gas Station) | Current starting candidate failed; reset to the next station | Any station between the old `start` and `i` would have the same or worse deficit at `i` (because we arrived with non-negative tank at each), so `i+1` is the only viable new candidate |
+| `if max_freq > (len(s)+1)//2: return ""` (Reorganize String) | Most frequent character would need adjacent placement | With more than ceil(n/2) copies of one character, at least two must end up adjacent no matter how we arrange them |
+| `if weight <= remaining_capacity` (Fractional Knapsack) | The whole item fits in the remaining knapsack space | Take the entire item without computing a fraction; only compute a fraction when the item is larger than what remains |

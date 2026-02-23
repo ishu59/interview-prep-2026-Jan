@@ -252,7 +252,7 @@ All handbooks below have been created and follow the structure above.
 |---|---|---|---|
 | 1 | `sliding_window_handbook.md` | Sliding Window | Fixed window, variable window, counting subarrays, exactly-K trick |
 | 2 | `two_pointers_handbook.md` | Two Pointers | Opposite direction, same direction, fast/slow, partition |
-| 3 | `final_binary_search_handbook.md` | Binary Search | Standard search, boundary finding, search on answer space |
+| 3 | `binary_search_handbook.md` | Binary Search | Standard search, boundary finding, search on answer space |
 | 4 | `dynamic_programming_handbook.md` | Dynamic Programming | 1D, 2D, knapsack, LCS, LIS, state machine |
 | 5 | `advanced_dp_handbook.md` | Advanced DP | Bitmask DP, interval DP, state machine DP, tree DP |
 | 6 | `trees_handbook.md` | Trees | Traversals, BST, path problems, construction, LCA |

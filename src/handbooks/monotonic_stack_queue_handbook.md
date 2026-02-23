@@ -314,9 +314,11 @@ def nextGreaterElement(nums1, nums2):
     stack = []    # monotonic decreasing stack (stores values, not indices)
 
     for num in nums2:
-        # Pop all elements smaller than current; current is their NGE.
         # Why store values instead of indices here? Because nums2 has all distinct
         # elements and we only need a value-to-value mapping (no result array).
+        # Why `num > stack[-1]`? Pop every element that `num` is strictly greater
+        # than -- `num` becomes their NGE. Without this, smaller elements would
+        # linger on the stack and never get resolved.
         while stack and num > stack[-1]:
             smaller = stack.pop()
             nge_map[smaller] = num
@@ -393,12 +395,15 @@ def nextGreaterElements(nums):
     # have its NGE at index 0. Two passes simulate the wrap-around.
     for i in range(2 * n):
         # Why `i % n`? Maps indices n..2n-1 back to 0..n-1, simulating circularity.
+        # Without the modulo, index i would be out of bounds for i >= n.
+        # Why `nums[i % n] > nums[stack[-1]]`? Same as base NGE: pop everything
+        # that the current (circular) value is strictly greater than.
         while stack and nums[i % n] > nums[stack[-1]]:
             idx = stack.pop()
             result[idx] = nums[i % n]
         # Why only push during the first pass (i < n)?
         # The second pass exists only to RESOLVE remaining elements on the stack.
-        # Pushing again would create duplicate indices and waste work.
+        # Pushing again would create duplicate indices and corrupt the result array.
         if i < n:
             stack.append(i)
 
@@ -452,12 +457,15 @@ def dailyTemperatures(temperatures):
     stack = []  # stores indices of days waiting for a warmer day
 
     for i in range(n):
-        # Why `>` and not `>=`? "Warmer" means strictly higher temperature.
-        # A day with the same temperature does NOT resolve the wait.
+        # Why `temperatures[i] > temperatures[stack[-1]]`?
+        # "Warmer" means strictly higher temperature; equal does not resolve the wait.
+        # If we used `>=`, a day with the same temp would wrongly count as "warmer,"
+        # giving a distance of 0 days waited for a day with no actual improvement.
         while stack and temperatures[i] > temperatures[stack[-1]]:
             prev_day = stack.pop()
-            # Why `i - prev_day` is always positive: i > prev_day is guaranteed
-            # because we only push earlier indices onto the stack.
+            # Why `i - prev_day`? i is the current (resolving) day and prev_day is the
+            # earlier day being resolved. i > prev_day always holds since we only push
+            # earlier indices onto the stack, so the distance is always positive.
             answer[prev_day] = i - prev_day  # number of days waited
         stack.append(i)
 
@@ -525,21 +533,27 @@ class StockSpanner:
         self.idx = 0
 
     def next(self, price):
-        # Why `<=` and not `<`? The span includes days with EQUAL price.
-        # A day with the same price doesn't "block" the span -- only a
-        # strictly greater price does. So we pop equal prices too.
+        # Why `self.stack[-1][0] <= price` (not `< price`)?
+        # The span includes days with EQUAL price — equal prices don't "block."
+        # Only a STRICTLY greater price stops the span. Popping equal prices
+        # collapses them so the span calculation jumps over them correctly.
+        # Example: prices [3,3,3] → all three have span increasing as 1,2,3.
         while self.stack and self.stack[-1][0] <= price:
             self.stack.pop()
 
         # Span = distance from current index to the previous greater element.
+        # Why check `if self.stack`? If nothing is left, there is no day with
+        # a strictly greater price anywhere before today.
         if self.stack:
             # Why `self.idx - self.stack[-1][1]`? The stack top is the most
             # recent day with a STRICTLY greater price. Everything between
-            # that day and today has price <= today's price.
+            # that day (exclusive) and today (inclusive) has price <= today's price,
+            # so span = today's index minus that boundary index.
             span = self.idx - self.stack[-1][1]
         else:
-            # Why `self.idx + 1`? No previous greater price exists, so the
-            # span covers every day from day 0 to today (inclusive).
+            # Why `self.idx + 1`? No previous greater price exists anywhere,
+            # so the span covers every day from day 0 to today (0-indexed).
+            # Day 0 contributes 1, day 1 contributes 2, etc.
             span = self.idx + 1
 
         self.stack.append((price, self.idx))
@@ -633,8 +647,11 @@ def validSubarrays(nums):
     stack = []  # monotonic increasing stack (stores indices)
 
     for i in range(n):
-        # Why `<` (strictly less)? A subarray starting at idx is invalid once we
-        # hit an element SMALLER than nums[idx]. Equal elements are fine (>= nums[idx]).
+        # Why `nums[i] < nums[stack[-1]]` (strictly less)?
+        # A subarray starting at stack[-1] is valid as long as all later elements
+        # are >= nums[stack[-1]]. The first element STRICTLY smaller than nums[stack[-1]]
+        # is the earliest right boundary -- subarrays extending to or past it are invalid.
+        # Using `<=` would incorrectly treat equal elements as invalidating the subarray.
         while stack and nums[i] < nums[stack[-1]]:
             idx = stack.pop()
             nse[idx] = i
@@ -707,17 +724,21 @@ def largestRectangleArea(heights):
     heights_extended = heights + [0]
 
     for i in range(len(heights_extended)):
-        # Why `<`? We pop when the current bar is SHORTER than the stack top.
-        # This means the popped bar's rectangle can't extend further right.
-        # Why not `<=`? Using `<` keeps equal-height bars in the stack.
-        # The rightmost equal bar will eventually compute the correct full width.
+        # Why `heights_extended[i] < heights_extended[stack[-1]]` (strictly less)?
+        # We pop the stack top when the current bar is SHORTER — meaning the top bar's
+        # rectangle cannot extend any further to the right (it would be clipped by the
+        # current bar). Using `<=` instead would also pop equal bars immediately, causing
+        # the width to be computed too early; the rightmost equal bar gives the full width.
         while stack and heights_extended[i] < heights_extended[stack[-1]]:
             h = heights_extended[stack.pop()]
-            # Why `i if not stack`? If the stack is empty after popping, this bar
-            # was the shortest seen so far -- its rectangle extends from index 0
-            # all the way to i-1, giving width = i.
-            # Why `i - stack[-1] - 1`? The rectangle spans from (stack[-1] + 1)
-            # to (i - 1). We subtract 1 to exclude both boundary bars.
+            # Why `i if not stack`?
+            # If the stack is now empty, the popped bar was the shortest bar seen so far.
+            # Its rectangle can extend all the way to the left edge (index 0), so width = i.
+            # Why `i - stack[-1] - 1`?
+            # The new stack top is the nearest bar to the left that is SHORTER than `h`.
+            # The rectangle spans from index (stack[-1] + 1) to (i - 1), inclusive.
+            # Width = (i - 1) - (stack[-1] + 1) + 1 = i - stack[-1] - 1.
+            # Subtracting 1 excludes both boundary bars (they are shorter walls, not part of the rect).
             w = i if not stack else i - stack[-1] - 1
             max_area = max(max_area, h * w)
         stack.append(i)
@@ -784,8 +805,10 @@ def maximalRectangle(matrix):
     Space: O(cols)
     """
     # Why check both `not matrix` and `not matrix[0]`?
-    # `not matrix` catches empty input []. `not matrix[0]` catches [[]]
-    # (a matrix with one empty row). Either way, no area is possible.
+    # `not matrix` catches a completely empty input [].
+    # `not matrix[0]` catches [[]] — a matrix with one row but zero columns.
+    # Both cases mean there are no cells, so the answer is 0. Checking only one
+    # would let the other case through and cause an IndexError or wrong result.
     if not matrix or not matrix[0]:
         return 0
 
@@ -797,9 +820,10 @@ def maximalRectangle(matrix):
         # Build histogram heights
         for j in range(cols):
             # Why `+= 1` for '1' but `= 0` for '0'?
-            # A '1' extends the bar from the row above (consecutive 1s stack up).
-            # A '0' breaks the streak -- the bar resets to height 0, not -1,
-            # because you can't build a rectangle through a gap.
+            # A '1' continues an unbroken column of 1s upward, so the bar grows by 1.
+            # A '0' means the column of 1s is broken at this row — no rectangle can
+            # span through a '0', so the bar must restart from 0 (not -1, since
+            # height represents bar height in the histogram, not a signed sentinel).
             if row[j] == '1':
                 heights[j] += 1
             else:
@@ -885,27 +909,34 @@ def trap(height):
     water = 0
 
     for i in range(len(height)):
-        # Why `>`? We need a bar TALLER than the valley floor to form a right wall.
-        # Equal height doesn't create a valley to trap water in.
+        # Why `height[i] > height[stack[-1]]` (strictly greater)?
+        # We need a bar TALLER than the current valley floor to form a right wall.
+        # An equal-height bar does not create a new water pocket above the valley
+        # floor — the water level would be exactly at the floor, trapping nothing.
         while stack and height[i] > height[stack[-1]]:
             valley = stack.pop()
 
-            # Why check `if not stack`? After popping the valley, if the stack is
-            # empty, there's no left wall. Water needs BOTH a left and right wall
-            # to be trapped. Without a left wall, water flows off the left side.
+            # Why check `if not stack` after popping the valley?
+            # After removing the valley floor, if nothing is left, there is no left
+            # wall to contain the water on the left side. Without a left wall the
+            # water simply flows off to the left, so we cannot count any trapped water.
             if not stack:
                 break
 
             left_wall = stack[-1]
-            # Why `min(left_wall_height, right_wall_height)`? Water level is
-            # limited by the SHORTER wall (water would overflow the shorter one).
-            # Why subtract `height[valley]`? The valley floor displaces water.
-            # Can bounded_height be negative? No -- the valley was popped because
-            # height[i] > height[valley], and left_wall >= valley (stack invariant),
-            # so min(left, right) >= height[valley].
+            # Why `min(height[left_wall], height[i])`?
+            # The effective water level is capped by the SHORTER of the two walls —
+            # water spills over the shorter one first. Using the taller wall would
+            # overcount the trapped volume.
+            # Why subtract `height[valley]`?
+            # The valley floor already occupies space; water sits ABOVE it, not below.
+            # Can bounded_height be negative? No — the valley was popped only because
+            # height[i] > height[valley], and the left_wall is >= valley by the
+            # stack's decreasing invariant, so min(left, right) >= height[valley].
             bounded_height = min(height[left_wall], height[i]) - height[valley]
-            # Why `i - left_wall - 1`? The water spans between the two walls,
-            # not including the walls themselves.
+            # Why `i - left_wall - 1`?
+            # Water fills the gap BETWEEN the two walls, not including the walls.
+            # Positions left_wall+1 through i-1 are filled, giving width = i - left_wall - 1.
             width = i - left_wall - 1
             water += bounded_height * width
 
@@ -1000,21 +1031,27 @@ def maxSlidingWindow(nums, k):
     result = []
 
     for i in range(len(nums)):
-        # Why `<= i - k`? Window covers [i-k+1, i]. Index i-k is one step
-        # outside. So any index <= i-k is stale and must be removed.
+        # Why `dq[0] <= i - k`?
+        # The current window is [i-k+1, i]. The smallest valid left index is i-k+1,
+        # so any index <= i-k is one step outside the window and must be evicted.
+        # Using `<` instead of `<=` would keep one extra stale index, causing the
+        # reported maximum to sometimes come from outside the valid window bounds.
         while dq and dq[0] <= i - k:
             dq.popleft()
 
-        # Why `>=` (not `>`)? If the back element equals nums[i], the back
-        # element is older and will expire from the window sooner. The new
-        # element is equally large but fresher, so it's strictly better to keep.
+        # Why `nums[i] >= nums[dq[-1]]` (using `>=`, not just `>`)?
+        # If the back equals nums[i], the back is older and will leave the window
+        # before the new element does. The new element is equally large but longer-lived,
+        # so the older one can never be the unique maximum while the new one is present.
+        # Keeping it would waste space without it ever contributing to any answer.
         while dq and nums[i] >= nums[dq[-1]]:
             dq.pop()
 
         dq.append(i)
 
-        # Why `i >= k - 1`? The first valid window is [0..k-1], which completes
-        # when i reaches k-1. Before that, we don't have k elements yet.
+        # Why `i >= k - 1`?
+        # The first complete window spans [0, k-1] and is ready exactly when i == k-1.
+        # Before that, fewer than k elements have been seen, so no result is recorded.
         if i >= k - 1:
             result.append(nums[dq[0]])
 
@@ -1115,11 +1152,19 @@ def shortestSubarray(nums, k):
     result = float('inf')
 
     for j in range(n + 1):
-        # Check if current prefix minus front of deque >= k
+        # Why `prefix[j] - prefix[dq[0]] >= k`?
+        # dq[0] is the index of the smallest prefix sum seen so far (front of increasing deque).
+        # prefix[j] - prefix[dq[0]] is the subarray sum from dq[0] to j-1.
+        # When this sum reaches k, we found a valid subarray. We also popleft because
+        # no later j' > j can produce a SHORTER subarray using the same start dq[0].
         while dq and prefix[j] - prefix[dq[0]] >= k:
             result = min(result, j - dq.popleft())
 
-        # Maintain increasing order: remove from back if current prefix is ≤ back
+        # Why `prefix[j] <= prefix[dq[-1]]`?
+        # If the current prefix is <= the back's prefix, the back index is strictly
+        # worse as a starting point: it is older (farther left) yet has an equal or
+        # larger prefix, meaning any subarray starting there will have a smaller sum
+        # than one starting at j. The back can never give a better result, so remove it.
         while dq and prefix[j] <= prefix[dq[-1]]:
             dq.pop()
 
@@ -1189,14 +1234,23 @@ def removeKdigits(num, k):
     stack = []
 
     for digit in num:
-        # While we can still remove and the top of stack is larger
+        # Why all three conditions `k > 0 and stack and stack[-1] > digit`?
+        # `k > 0`: We must not remove more than the allowed budget of k digits.
+        #   Remove this check and we'd delete too many digits, shrinking the number wrong.
+        # `stack`: The stack might be empty; popping from an empty stack raises an error.
+        # `stack[-1] > digit`: Only remove the top if it is STRICTLY larger than the
+        #   current digit. Removing an equal or smaller digit would make the number BIGGER,
+        #   not smaller (e.g., removing '1' before '1' gains nothing or hurts).
+        # Together: greedily remove the leftmost "peak" while budget allows.
         while k > 0 and stack and stack[-1] > digit:
             stack.pop()
             k -= 1
         stack.append(digit)
 
-    # If we still have removals left, remove from the end
-    # (the stack is now non-decreasing, so the largest are at the end)
+    # Why `if k > 0: stack = stack[:-k]`?
+    # If the entire number was non-decreasing (e.g., "1234"), no pops occurred during
+    # the loop. The remaining budget k must still be consumed by removing the k largest
+    # digits, which are at the RIGHT end of the non-decreasing stack.
     if k > 0:
         stack = stack[:-k]
 
@@ -1263,13 +1317,21 @@ def removeDuplicateLetters(s):
     for ch in s:
         remaining[ch] -= 1
 
-        # Skip if already in the result
+        # Why `if ch in in_stack: continue`?
+        # Each letter must appear exactly once in the result. If ch is already
+        # in the stack, adding it again would violate the uniqueness constraint.
+        # We skip the current occurrence since a later, better-positioned one
+        # may have already been added (or the one in the stack is in the right spot).
         if ch in in_stack:
             continue
 
-        # Pop characters that are:
-        # 1) Greater than current (to get lexicographic order)
-        # 2) Will appear again later (safe to remove)
+        # Why all three conditions `stack and ch < stack[-1] and remaining[stack[-1]] > 0`?
+        # `stack`: Cannot pop from an empty stack.
+        # `ch < stack[-1]`: Only remove a character that is lexicographically LARGER
+        #   than the current one — doing so makes the result smaller (better order).
+        # `remaining[stack[-1]] > 0`: Only pop if the character appears later in `s`.
+        #   If remaining == 0, this is the last occurrence and removing it loses it forever,
+        #   violating the "every letter must appear" constraint.
         while stack and ch < stack[-1] and remaining[stack[-1]] > 0:
             removed = stack.pop()
             in_stack.remove(removed)
@@ -1331,6 +1393,13 @@ def maxNumber(nums1, nums2, k):
         drop = len(nums) - length  # number of elements we can drop
         stack = []
         for num in nums:
+            # Why `drop > 0 and stack and stack[-1] < num`?
+            # `drop > 0`: Only remove elements while the removal budget allows.
+            # `stack`: Guard against popping an empty stack.
+            # `stack[-1] < num`: Pop when the top is SMALLER than current —
+            #   we prefer the larger digit earlier for the maximum subsequence.
+            #   Removing a smaller digit and replacing it with a larger one increases
+            #   the lexicographic value of the result (opposite of Remove K Digits).
             while drop > 0 and stack and stack[-1] < num:
                 stack.pop()
                 drop -= 1
@@ -1962,3 +2031,52 @@ If you can do these five steps smoothly, you'll handle any monotonic stack probl
 3. Implement using the template, then trace through an example.
 4. If stuck for more than 15 minutes, review the pattern section above.
 5. After solving, write down the key insight in one sentence.
+
+---
+
+## Appendix: Conditional Quick Reference
+
+This table lists every key condition used in this handbook, its plain-English meaning, and the intuition behind it.
+
+### A. Stack Pop Conditions (Core Monotonic Logic)
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `while stack and nums[i] > nums[stack[-1]]` | Current element is strictly greater than the stack top | Pops all elements that have found their Next Greater Element (NGE = current). Using `>` (not `>=`) means equal values do NOT resolve each other — they are not "greater." |
+| `while stack and nums[i] < nums[stack[-1]]` | Current element is strictly smaller than the stack top | Pops all elements that have found their Next Smaller Element (NSE = current). Mirror of NGE logic; flip the comparison to flip the stack direction. |
+| `while stack and self.stack[-1][0] <= price` | Current price is greater than or equal to the stack top price | In Stock Span, equal prices do not block the span — only a strictly GREATER price does. Using `<=` collapses equal-price days so the span calculation jumps over them correctly. |
+| `while stack and height[i] > height[stack[-1]]` | Current bar is strictly taller than the stack top bar | In Trapping Rain Water, only a taller bar forms a valid right wall for a valley. An equal-height bar creates no new water pocket above the valley floor. |
+| `while stack and heights_extended[i] < heights_extended[stack[-1]]` | Current bar is strictly shorter than the stack top bar | In Largest Rectangle, a shorter bar means the stack-top bar's rectangle cannot extend further right. Using `<` (not `<=`) keeps equal bars, letting the rightmost equal bar compute the full combined width. |
+| `while stack and stack[-1] > digit` | Current digit is smaller than the stack top digit | In Remove K Digits, removing a larger digit before a smaller one makes the number lexicographically smaller. Only pop when the top is STRICTLY larger — equal digits gain nothing. |
+| `while stack and ch < stack[-1] and remaining[stack[-1]] > 0` | Current char is smaller, the stack top is larger, and the top still appears later | In Remove Duplicate Letters, all three guards are needed: pop only when lexicographic order improves (`ch < stack[-1]`), the character won't be lost (`remaining > 0`), and the stack is non-empty. |
+
+### B. Deque Maintenance Conditions (Sliding Window)
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `while dq and dq[0] <= i - k` | The front index is outside the current window | Window `[i-k+1, i]` means any index `<= i-k` is stale. Using `<=` (not `<`) correctly evicts an index that is exactly one step past the left boundary. |
+| `while dq and nums[i] >= nums[dq[-1]]` | Current value is at least as large as the back value | The back element is older; if equally large, it will expire from the window sooner. The fresher equal element is strictly better to keep. Using `>=` (not `>`) avoids storing redundant equal-value candidates. |
+| `while dq and prefix[j] - prefix[dq[0]] >= k` | Subarray sum from deque-front to current position is at least k | This detects a valid subarray. We also pop the front immediately because no later `j' > j` can produce a shorter subarray using the same start index (`j - start` only grows). |
+| `while dq and prefix[j] <= prefix[dq[-1]]` | Current prefix sum is at most the back's prefix sum | The back index is older (farther left) and has an equal or larger prefix, making it a worse start: any sum computed from it will be smaller than from `j`. It can never be the best start, so discard it. |
+| `while dq and dq[0] <= i - k` (Template 3) | Staleness check: front index has left the window | Identical logic to Problem 5.1 above. The condition must be `<=` so that an index equal to `i - k` (which is one past the valid left edge `i - k + 1`) is removed. |
+
+### C. Width & Area Calculation Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `w = i - stack[-1] - 1` | Width of rectangle between left and right boundaries (exclusive) | After popping a bar at index `p`, the stack top is the nearest shorter bar to the left. The rectangle spans from `stack[-1]+1` to `i-1` (both walls excluded), giving width `(i-1) - (stack[-1]+1) + 1 = i - stack[-1] - 1`. |
+| `w = i if not stack else i - stack[-1] - 1` | When stack is empty, the bar spans all the way to the left edge | An empty stack means the popped bar was the shortest bar seen so far. Its rectangle starts at index 0 and ends at `i-1`, giving width `i`. The conditional handles both the "no left boundary" and "left boundary exists" cases. |
+| `width = i - left_wall - 1` | Water width between left wall and right wall (exclusive) | In Trapping Rain Water, the water fills positions `left_wall+1` through `i-1` (the walls themselves are solid bars, not water). Width = `(i-1) - (left_wall+1) + 1 = i - left_wall - 1`. |
+| `answer[prev_day] = i - prev_day` | Number of days between the resolving day and the waiting day | `i` is today (the warmer day) and `prev_day` is the earlier day that was waiting. Their index difference equals the number of days waited. Always positive because `i > prev_day` by construction. |
+| `result = min(result, j - dq.popleft())` | Subarray length from popped start index to current end index | `j` is the end (exclusive) and `dq.popleft()` is the start (inclusive) in terms of the prefix sum array, so `j - start` equals the number of elements in the original `nums` subarray. |
+| `nse[i] - i` | Number of valid subarrays starting at index `i` | Subarrays `[i..i], [i..i+1], ..., [i..nse[i]-1]` are all valid (none contain an element smaller than `nums[i]`). The count is `nse[i] - i`; when `nse[i] == n` it covers all remaining positions. |
+
+### D. Result Assignment & Edge Case Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if stack: result[stack.pop()] = nums[i]` | Only assign a result if the stack has an index waiting | Not every element has an NGE/NSE. Elements never popped from the stack have no qualifying neighbor; they keep their default value (usually -1). Checking `if stack` prevents an `IndexError` on an empty pop. |
+| `if i < n: stack.append(i)` | Only push indices during the first pass of a circular array | The second pass (indices `n` to `2n-1`) exists solely to resolve elements still on the stack by simulating wrap-around. Pushing during the second pass would insert duplicate indices, corrupting result-array writes. |
+| `if k > 0: stack = stack[:-k]` | After the main loop, consume any remaining removal budget from the right end | If no pops occurred (the number was already non-decreasing), the budget `k` is unused. The largest digits in a non-decreasing sequence are at the right end, so removing `k` digits from the right minimizes the result. |
+| `result = ''.join(stack).lstrip('0') or '0'` | Strip leading zeros; return '0' if the result is empty | Removing digits may expose leading zeros (e.g., "10200" with k=1 → "0200" → "200"). Removing ALL digits should yield "0" not an empty string. The `or '0'` guard handles the all-zeros-removed edge case. |
+| `if i >= k - 1: result.append(nums[dq[0]])` | Only record a window maximum once a full window of size k exists | The first complete window is `[0, k-1]`, completed when `i == k-1`. Appending before that would record maximums for partial windows, which are not asked for. |

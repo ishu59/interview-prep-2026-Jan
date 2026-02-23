@@ -884,6 +884,10 @@ class MyCalendar:
 
     def book(self, start: int, end: int) -> bool:
         for s, e in self.bookings:
+            # Why `start < e and end > s`?
+            # Two intervals [start, end) and [s, e) overlap iff the new one
+            # starts before the existing one ends AND ends after it starts.
+            # If either condition fails, there is a gap with no conflict.
             if start < e and end > s:  # Overlap
                 return False
 
@@ -904,11 +908,18 @@ class MyCalendar:
         # Find where to insert
         i = bisect.bisect_right(self.starts, start)
 
-        # Check overlap with previous booking (if exists)
+        # Why `self.ends[i-1] > start`?
+        # The previous booking starts before or at our start (by bisect position).
+        # If its end is after our start, the two intervals overlap -- conflict.
+        # Strict `>` because if the previous booking ends exactly at our start,
+        # the meetings are back-to-back with no overlap.
         if i > 0 and self.ends[i-1] > start:
             return False
 
-        # Check overlap with next booking (if exists)
+        # Why `end > self.starts[i]`?
+        # The next booking starts after our start (by bisect position).
+        # If our end goes past that booking's start, we would overlap it.
+        # Strict `>` because ending exactly at the next booking's start is fine.
         if i < len(self.starts) and end > self.starts[i]:
             return False
 
@@ -932,12 +943,20 @@ class MyCalendarTwo:
     def book(self, start: int, end: int) -> bool:
         # Check for triple booking
         for s, e in self.overlaps:
+            # Why `start < e and end > s`?
+            # This is the standard two-interval overlap check. If the new
+            # booking overlaps any region that is already double-booked,
+            # adding it would create a triple booking -- reject it.
             if start < e and end > s:
                 return False
 
         # Add overlaps with existing bookings
         for s, e in self.bookings:
             if start < e and end > s:
+                # Why `max(start, s)` and `min(end, e)`?
+                # The overlap region starts at the later of the two starts
+                # and ends at the earlier of the two ends. This pinpoints
+                # exactly the double-booked window to track.
                 self.overlaps.append((max(start, s), min(end, e)))
 
         self.bookings.append((start, end))
@@ -958,9 +977,16 @@ class MyCalendarThree:
         self.timeline = defaultdict(int)
 
     def book(self, start: int, end: int) -> int:
+        # Why +1 at start and -1 at end?
+        # We model each booking as an event: the room count rises at the
+        # start time and falls at the end time. Summing these deltas left
+        # to right gives the concurrent bookings at any moment.
         self.timeline[start] += 1
         self.timeline[end] -= 1
 
+        # Why sort the timeline keys?
+        # Events must be processed in chronological order so the running
+        # sum correctly reflects how many bookings are active at each time.
         max_booking = current = 0
         for time in sorted(self.timeline.keys()):
             current += self.timeline[time]
@@ -981,14 +1007,21 @@ class MyCalendarThree:
 
 ```python
 def removeCoveredIntervals(intervals: list[list[int]]) -> int:
-    # Sort by start ascending, then by end descending
-    # This ensures if starts are equal, longer interval comes first
+    # Why sort by (start ascending, end descending)?
+    # If two intervals share the same start, the longer one comes first.
+    # This guarantees the shorter one is seen after, and we correctly
+    # detect it as covered (its end <= prev_end).
     intervals.sort(key=lambda x: (x[0], -x[1]))
 
     count = 0
     prev_end = 0
 
     for start, end in intervals:
+        # Why `end > prev_end`?
+        # If the current interval's end does not exceed the farthest end
+        # seen so far, the current interval is entirely contained within
+        # a previous one -- it is covered and should not be counted.
+        # Strict `>` means even touching (end == prev_end) is covered.
         if end > prev_end:
             count += 1
             prev_end = end
@@ -1016,14 +1049,29 @@ class SummaryRanges:
         inserted = False
 
         for interval in self.intervals:
+            # Why `interval[1] < new_interval[0] - 1` (subtract 1)?
+            # In a data stream of integers, consecutive numbers like 3 and 4
+            # are adjacent and should merge into [3,4]. The `-1` accounts for
+            # this adjacency: if an existing interval ends at 4 and the new
+            # value is 5, they form a continuous range [4,5] and must merge.
+            # Without `-1`, integer adjacency would create spurious gaps.
             if interval[1] < new_interval[0] - 1:
                 result.append(interval)
+            # Why `new_interval[1] < interval[0] - 1`?
+            # Symmetrically, if the new interval ends at 4 and the existing
+            # interval starts at 6, there is a true gap (5 is missing).
+            # If it ends at 5 and the existing starts at 6, they are adjacent
+            # and should merge. The `-1` ensures adjacency triggers a merge.
             elif new_interval[1] < interval[0] - 1:
                 if not inserted:
                     result.append(new_interval)
                     inserted = True
                 result.append(interval)
             else:
+                # Why min/max here?
+                # The new value or interval overlaps or is adjacent to an
+                # existing interval. We absorb the existing interval into
+                # new_interval by taking the widest possible range.
                 new_interval = [
                     min(new_interval[0], interval[0]),
                     max(new_interval[1], interval[1])
@@ -1188,10 +1236,15 @@ Sort by    Sort by     Sweep
 
 ### Merge Intervals
 ```python
+# Why sort by x[0] (start)? After sorting, each interval only needs
+# to be compared with its immediate predecessor in the result list.
 intervals.sort(key=lambda x: x[0])
 merged = [intervals[0]]
 for curr in intervals[1:]:
+    # Why `<=`? Touching intervals (e.g., [1,3] and [3,5]) should merge.
     if curr[0] <= merged[-1][1]:
+        # Why max? The current interval might be fully contained inside
+        # the last merged interval -- max prevents shrinking the range.
         merged[-1][1] = max(merged[-1][1], curr[1])
     else:
         merged.append(curr)
@@ -1199,9 +1252,14 @@ for curr in intervals[1:]:
 
 ### Non-overlapping (Max Keep)
 ```python
+# Why sort by x[1] (end)? An interval ending earlier leaves more
+# room for future intervals, making the greedy keep-earliest-end
+# strategy optimal for maximizing the number kept.
 intervals.sort(key=lambda x: x[1])
 count, end = 0, float('-inf')
 for s, e in intervals:
+    # Why `>=`? If the current interval starts exactly where the
+    # last kept one ended, they are back-to-back, not overlapping.
     if s >= end:
         count += 1
         end = e
@@ -1211,8 +1269,11 @@ for s, e in intervals:
 ```python
 events = []
 for s, e in intervals:
-    events.append((s, 1))
-    events.append((e, -1))
+    events.append((s, 1))   # Room opens at start
+    events.append((e, -1))  # Room closes at end
+# Why sort tuples? Default tuple sort processes end events (-1) before
+# start events (+1) at the same time, so a room freed at T is counted
+# as available before a new meeting beginning at T is counted.
 events.sort()
 ```
 
@@ -1276,3 +1337,52 @@ events.sort()
 4. Advanced: 986 → 1024 → 759
 
 Good luck with your interview preparation!
+
+---
+
+## Appendix: Conditional Quick Reference
+
+This table lists every key condition used in this handbook, its plain-English meaning, and the intuition behind it.
+
+### A. Overlap Detection Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `current[0] <= last[1]` | Current interval starts at or before the last merged interval ends | `<=` includes touching intervals (e.g., [1,3] and [3,5]) which should merge into one |
+| `intervals[i][1] < newInterval[0]` | Existing interval ends strictly before the new interval starts | Strict `<` means if they touch (end == start), they overlap and belong in the next phase |
+| `intervals[i][0] <= newInterval[1]` | Existing interval starts at or before the new interval ends | `<=` captures all intervals that overlap or touch the new interval's right edge |
+| `start < e and end > s` | New booking starts before existing ends AND ends after existing starts | Standard two-interval overlap test; both conditions must hold simultaneously |
+| `start <= end` (intersection) | The computed intersection start does not exceed the computed end | If start > end the two intervals have a gap; `<=` includes single-point touches like [3,3] |
+| `intervals[i][0] < intervals[i-1][1]` | Current meeting starts before the previous one ends | Strict `<` so back-to-back meetings (one ends exactly as next starts) are not treated as a conflict |
+| `interval[0] <= merged[-1][1]` | Employee shift starts at or before the latest busy period ends | `<=` ensures zero-gap shifts are merged (no free time exists between them) |
+
+### B. Merge & Update Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `merged[-1][1] = max(merged[-1][1], interval[1])` | Extend the last merged interval's end only if the current one reaches farther | Without `max`, a fully contained interval (e.g., [2,5] inside [1,10]) would shrink the merged range |
+| `newInterval[0] = min(newInterval[0], intervals[i][0])` | Absorb the earliest start among all overlapping intervals | Ensures the merged interval covers the leftmost edge of all overlapping input intervals |
+| `newInterval[1] = max(newInterval[1], intervals[i][1])` | Absorb the latest end among all overlapping intervals | Ensures the merged interval covers the rightmost edge of all overlapping input intervals |
+| `new_interval = [min(...), max(...)]` (data stream) | Expand the accumulating interval to cover an adjacent or overlapping existing interval | Builds the widest correct range as adjacent integers and overlapping intervals are absorbed one by one |
+| `end > prev_end` (remove covered) | Current interval's end reaches beyond the farthest seen so far | If `end <= prev_end`, the current interval is fully contained inside a prior one and is covered |
+
+### C. Greedy Scheduling Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `start >= prev_end` | Current interval starts at or after the last kept interval ends | `>=` treats back-to-back intervals as non-overlapping, so we keep both; removing would count a non-conflict as a removal |
+| `intervals[i][0] < prev_end` | Current interval starts before the previous one ends — true overlap | Strict `<` means touching intervals (back-to-back) are NOT overlapping and the current one is kept, not removed |
+| `start > current_end` (arrows) | Balloon starts strictly after the position of the last arrow | Strict `>` because a balloon starting exactly at `current_end` is still popped by the arrow at that position |
+| `heap[0] <= start` (meeting rooms) | The earliest-ending ongoing meeting finishes at or before this meeting starts | `<=` allows the room to be reused for back-to-back meetings; using `<` would waste a room unnecessarily |
+| `intervals[i][0] <= current_end` (coverage) | A clip or interval starts within the already-covered range | An interval starting after `current_end` would leave a gap; only intervals starting within range can extend coverage |
+| `heap[0] < day` (max events) | An event in the heap ended strictly before today | Strict `<` because an event ending on `day` can still be attended today; only truly past events are discarded |
+
+### D. Sorting & Ordering Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `sort by start (x[0])` | Order intervals by when they begin | Ensures neighbors in the sorted list are the best candidates for merging; any overlap can only be with the immediately preceding interval |
+| `sort by end (x[1])` | Order intervals by when they finish | Greedy selection of the interval ending earliest leaves maximum room for future intervals (used in non-overlapping / arrows problems) |
+| `sort by (start asc, end desc)` | When starts are equal, put longer intervals first | Guarantees that if a short interval is fully covered by a longer one with the same start, the shorter is processed after and detected as covered |
+| `events.sort()` (sweep line) | Sort event tuples `(time, delta)` by time, breaking ties by delta | Default tuple comparison processes delta `-1` (end) before `+1` (start) at equal times, so a freed room is counted available before a new occupant is added — prevents over-counting concurrent meetings |
+| `sort by start, then greedy farthest-end` (coverage) | Process intervals left to right; at each coverage boundary pick the one reaching farthest | Ensures no gap is left uncovered while using the fewest intervals; picking any other interval could leave a hole or require more intervals later |

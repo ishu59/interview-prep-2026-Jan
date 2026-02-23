@@ -399,7 +399,10 @@ Output: [1, 2, 3, 5]
 **Python Solution:**
 ```python
 def sortArray(nums: list[int]) -> list[int]:
-    # Base case: 0 or 1 elements are already sorted.
+    # Why `len(nums) <= 1`?
+    # An array of size 0 (empty) or size 1 is trivially sorted.
+    # Using <= 1 (not == 0) catches both: an empty call would produce
+    # infinite recursion without this guard.
     if len(nums) <= 1:
         return nums
 
@@ -410,10 +413,15 @@ def sortArray(nums: list[int]) -> list[int]:
     # Merge two sorted halves
     result = []
     i = j = 0
-    # Continue while both halves have unprocessed elements.
+    # Why `i < len(left) and j < len(right)` (both conditions)?
+    # We can only safely compare left[i] and right[j] when BOTH indices
+    # are in bounds. If either half is exhausted, there's nothing to compare
+    # against — we simply drain the remainder directly.
     while i < len(left) and j < len(right):
-        # Why <=? Preserves stability -- equal elements from the left
-        # half (which appeared first in the original array) are placed first.
+        # Why `<=` and not `<`?
+        # Using <= makes the sort STABLE: when left[i] == right[j], we take
+        # from the LEFT side first, preserving the original relative order
+        # of equal elements. Changing to < would make the sort unstable.
         if left[i] <= right[j]:
             result.append(left[i])
             i += 1
@@ -467,12 +475,19 @@ Total reverse pairs from all levels: 2
 **Python Solution:**
 ```python
 def reversePairs(nums: list[int]) -> int:
+    # Why `if not nums`?
+    # An empty list has no pairs at all, so we return 0 immediately.
+    # Without this guard, len(arr) // 2 would be 0 and slices would create
+    # infinite empty recursive calls.
     if not nums:
         return 0
 
     count = [0]
 
     def merge_sort(arr):
+        # Why `len(arr) <= 1`?
+        # A single element cannot form any reverse pair. This is the base
+        # case that terminates recursion and returns an already-sorted array.
         if len(arr) <= 1:
             return arr
 
@@ -489,6 +504,8 @@ def reversePairs(nums: list[int]) -> int:
             # all later left elements (i+1, i+2, ...) also satisfy it.
             # And because right is sorted, j only moves forward --
             # we never re-check earlier right elements.
+            # Why `j < len(right)` guard? j advances but never resets;
+            # once we've exhausted right, no more pairs are possible.
             while j < len(right) and left[i] > 2 * right[j]:
                 j += 1
             # j is the count of right elements that form reverse pairs
@@ -500,6 +517,9 @@ def reversePairs(nums: list[int]) -> int:
         # Standard merge
         merged = []
         i = j = 0
+        # Why `i < len(left) and j < len(right)`?
+        # Both pointers must be in bounds before we can compare. Once one
+        # side runs out, the other is appended directly (already sorted).
         while i < len(left) and j < len(right):
             if left[i] <= right[j]:
                 merged.append(left[i])
@@ -571,6 +591,10 @@ def countSmaller(nums: list[int]) -> list[int]:
     indexed = list(enumerate(nums))  # [(index, value), ...]
 
     def merge_sort(arr):
+        # Why `len(arr) <= 1`?
+        # A single element has no right-side neighbors. This base case stops
+        # recursion and returns the element (paired with its original index)
+        # as a trivially sorted subarray.
         if len(arr) <= 1:
             return arr
 
@@ -582,11 +606,14 @@ def countSmaller(nums: list[int]) -> list[int]:
         i = j = 0
         right_count = 0  # How many from right have been placed
 
+        # Why `i < len(left) and j < len(right)`?
+        # We compare values from both halves simultaneously. Once either
+        # half is exhausted we break out and handle each side separately.
         while i < len(left) and j < len(right):
             # Why compare [1] (the value) and not [0] (the index)?
             # We sort by value to determine ordering, but track original
             # indices to know WHERE to store each count.
-            # Why <=? When values are equal, taking from the left side
+            # Why `<=`? When values are equal, taking from the left side
             # first avoids counting equal elements as "smaller."
             if left[i][1] <= right[j][1]:
                 # left[i] is placed; all right elements placed so far
@@ -602,8 +629,10 @@ def countSmaller(nums: list[int]) -> list[int]:
                 merged.append(right[j])
                 j += 1
 
-        # Remaining left elements: each one has right_count smaller
-        # elements from the right half placed before it.
+        # Why `while i < len(left)` and add right_count?
+        # All remaining left elements haven't been placed yet. Every one of
+        # them was preceded by `right_count` smaller right elements, so we
+        # credit each of them with the full accumulated right_count.
         while i < len(left):
             counts[left[i][0]] += right_count
             merged.append(left[i])
@@ -671,6 +700,9 @@ def findKthLargest(nums: list[int], k: int) -> int:
     target = len(nums) - k
 
     def quick_select(arr, k):
+        # Why `len(arr) == 1`?
+        # Only one candidate remains — it must be the element at position k.
+        # This is the base case that terminates the partition recursion.
         if len(arr) == 1:
             return arr[0]
 
@@ -679,10 +711,21 @@ def findKthLargest(nums: list[int], k: int) -> int:
         highs = [x for x in arr if x > pivot]
         pivots = [x for x in arr if x == pivot]
 
+        # Why `k < len(lows)` (strict less-than)?
+        # lows contains exactly the elements at positions 0..len(lows)-1.
+        # If k is within that range, the answer lives in lows, not in pivots.
+        # Using < (not <=) is correct because lows occupies indices 0 to
+        # len(lows)-1 — k == len(lows) would fall in the pivot group.
         if k < len(lows):
             return quick_select(lows, k)
+        # Why `k < len(lows) + len(pivots)`?
+        # All pivot copies occupy the contiguous block [len(lows),
+        # len(lows)+len(pivots)-1]. If k falls in that range, every pivot
+        # has the same value, so the answer is just the pivot itself.
         elif k < len(lows) + len(pivots):
             return pivot
+        # Otherwise k is in the highs region. Subtract the sizes of lows
+        # and pivots to get k's 0-based position within the highs subarray.
         else:
             return quick_select(highs, k - len(lows) - len(pivots))
 
@@ -718,6 +761,9 @@ def topKFrequent(nums: list[int], k: int) -> list[int]:
 
     def quick_select(lo, hi, k_smallest):
         """Partition unique[lo..hi] so that the k_smallest most frequent are on the right."""
+        # Why `lo == hi`?
+        # Only one element remains in the range — it's already in its
+        # correct position. No further partitioning is possible or needed.
         if lo == hi:
             return
 
@@ -729,6 +775,11 @@ def topKFrequent(nums: list[int], k: int) -> list[int]:
 
         # Partition: elements with freq < pivot_freq go left
         store = lo
+        # Why `freq[unique[i]] < pivot_freq`?
+        # We want the k_smallest most-frequent elements on the RIGHT side.
+        # Elements with frequency less than the pivot's belong to the left
+        # (less frequent) region. The pivot and higher-frequency elements
+        # accumulate on the right via the store pointer.
         for i in range(lo, hi):
             if freq[unique[i]] < pivot_freq:
                 unique[store], unique[i] = unique[i], unique[store]
@@ -737,9 +788,15 @@ def topKFrequent(nums: list[int], k: int) -> list[int]:
         # Move pivot to final position
         unique[store], unique[hi] = unique[hi], unique[store]
 
-        # store is the final index of the pivot
+        # Why `store == k_smallest`?
+        # The pivot has landed exactly at the boundary index. Everything to
+        # its right (indices store+1..hi) is at least as frequent, which
+        # are exactly the top-k elements we want. We're done.
         if store == k_smallest:
             return
+        # Why `store < k_smallest`?
+        # The pivot settled too far left — k_smallest falls in the right
+        # partition, so we recurse right to find the true boundary.
         elif store < k_smallest:
             quick_select(store + 1, hi, k_smallest)
         else:
@@ -810,7 +867,10 @@ Binary search on nums1 (shorter array):
 **Python Solution:**
 ```python
 def findMedianSortedArrays(nums1: list[int], nums2: list[int]) -> float:
-    # Ensure nums1 is the shorter array
+    # Why `if len(nums1) > len(nums2): swap`?
+    # We binary search on nums1. Binary search on the shorter array gives
+    # O(log(min(m,n))) time. If nums1 were longer, we'd do O(log(max(m,n)))
+    # work unnecessarily. Swapping ensures we always search the smaller space.
     if len(nums1) > len(nums2):
         nums1, nums2 = nums2, nums1
 
@@ -819,6 +879,10 @@ def findMedianSortedArrays(nums1: list[int], nums2: list[int]) -> float:
 
     lo, hi = 0, m
 
+    # Why `lo <= hi`?
+    # We are binary searching over valid partition counts [0..m]. Using <=
+    # ensures we check every possible partition including lo==hi (where only
+    # 0 or all elements from nums1 go to the left side).
     while lo <= hi:
         i = (lo + hi) // 2  # Partition index in nums1
         j = half - i         # Partition index in nums2
@@ -829,14 +893,23 @@ def findMedianSortedArrays(nums1: list[int], nums2: list[int]) -> float:
         left2 = nums2[j - 1] if j > 0 else float('-inf')
         right2 = nums2[j] if j < n else float('inf')
 
+        # Why `left1 <= right2 and left2 <= right1`?
+        # This is the partition correctness invariant: every element on the
+        # left side must be <= every element on the right side. We need both
+        # cross-comparisons because elements can come from either array.
+        # If this holds, we have the correct left/right split for the median.
         if left1 <= right2 and left2 <= right1:
             # Found correct partition
             if (m + n) % 2 == 1:
                 return max(left1, left2)
             else:
                 return (max(left1, left2) + min(right1, right2)) / 2
+        # Why `hi = i - 1` when `left1 > right2`?
+        # left1 is too large — we put too many elements from nums1 on the
+        # left side. Shrink i by moving hi left to try a smaller partition.
         elif left1 > right2:
             hi = i - 1  # Too many from nums1
+        # Otherwise left2 > right1: too few from nums1, expand i rightward.
         else:
             lo = i + 1  # Too few from nums1
 
@@ -913,6 +986,11 @@ class TreeNode:
 
 def sortedArrayToBST(nums: list[int]) -> TreeNode:
     def build(lo, hi):
+        # Why `lo > hi` (not `lo >= hi`)?
+        # When lo == hi, exactly one element remains — it becomes a leaf node.
+        # Only when lo > hi is the range empty (e.g., after mid-1 < lo),
+        # meaning no node should be created. Using >= would skip single-element
+        # leaves and produce an incorrect or incomplete tree.
         if lo > hi:
             return None
 
@@ -984,6 +1062,11 @@ def buildTree(preorder: list[int], inorder: list[int]) -> TreeNode:
     pre_idx = [0]  # Use list to allow mutation in nested function
 
     def build(in_lo, in_hi):
+        # Why `in_lo > in_hi`?
+        # The inorder range is empty — this subtree has no nodes. Returning
+        # None correctly represents an absent child. Without this check, the
+        # next preorder value would be consumed as a phantom root node,
+        # corrupting the entire tree structure.
         if in_lo > in_hi:
             return None
 
@@ -991,6 +1074,11 @@ def buildTree(preorder: list[int], inorder: list[int]) -> TreeNode:
         pre_idx[0] += 1
 
         root = TreeNode(root_val)
+        # Why `mid = inorder_map[root_val]`?
+        # In inorder traversal, the root splits the array: everything to its
+        # LEFT is the left subtree, everything to its RIGHT is the right
+        # subtree. The hashmap gives us this split index in O(1) instead of
+        # scanning the array (which would degrade to O(n^2) overall).
         mid = inorder_map[root_val]
 
         # Build left subtree first (preorder: root, LEFT, right)
@@ -1059,6 +1147,10 @@ def buildTree(inorder: list[int], postorder: list[int]) -> TreeNode:
     post_idx = [len(postorder) - 1]
 
     def build(in_lo, in_hi):
+        # Why `in_lo > in_hi`?
+        # The inorder range is empty — this subtree has no nodes.
+        # Without this guard, we'd consume the next postorder element as a
+        # phantom root for a nonexistent subtree, corrupting the entire tree.
         if in_lo > in_hi:
             return None
 
@@ -1066,10 +1158,21 @@ def buildTree(inorder: list[int], postorder: list[int]) -> TreeNode:
         post_idx[0] -= 1
 
         root = TreeNode(root_val)
+        # Why `inorder_map[root_val]` gives the split?
+        # Inorder traversal is: [LEFT subtree] ROOT [RIGHT subtree].
+        # Everything at indices < mid belongs to the left subtree;
+        # everything > mid belongs to the right. The hashmap gives this
+        # split in O(1) — linear search would make the whole algorithm O(n^2).
         mid = inorder_map[root_val]
 
-        # Build RIGHT subtree first (postorder: left, right, ROOT)
-        # We consume from the end, so right comes before left
+        # Why build RIGHT before LEFT here?
+        # Postorder is: left, right, ROOT. We're consuming from the END
+        # of postorder (post_idx decrements). So the element just before
+        # the current root is the root of the RIGHT subtree, not the left.
+        # If we built left first, we'd consume the right subtree's root
+        # for the left subtree — the tree would be completely wrong.
+        # Analogy: reading a stack of papers placed face-down (left, right, root)
+        # — the first paper you pick up IS the right subtree's root.
         root.right = build(mid + 1, in_hi)
         root.left = build(in_lo, mid - 1)
 
@@ -1129,16 +1232,36 @@ def searchMatrix(matrix: list[list[int]], target: int) -> bool:
         return False
 
     rows, cols = len(matrix), len(matrix[0])
-    row, col = 0, cols - 1  # Start at top-right corner
+    # Why start at the TOP-RIGHT corner (not top-left or bottom-right)?
+    # Top-right is the unique corner where ONE comparison can eliminate
+    # an entire row OR an entire column — never both, never neither:
+    #   - current > target: every cell BELOW in this column is also > target
+    #     (columns are sorted top-to-bottom). Eliminate column → move left.
+    #   - current < target: every cell to the LEFT in this row is also < target
+    #     (rows are sorted left-to-right). Eliminate row → move down.
+    # Top-left has two "increase" directions (right, down) — no clean elimination.
+    # Bottom-right has two "decrease" directions (left, up) — same problem.
+    row, col = 0, cols - 1
 
+    # Why `row < rows AND col >= 0`?
+    # row == rows means we've fallen off the bottom (exhausted all rows).
+    # col < 0 means we've fallen off the left (exhausted all columns).
+    # Either exit means target is not in the matrix — we've searched everything
+    # reachable from the top-right corner.
     while row < rows and col >= 0:
         val = matrix[row][col]
         if val == target:
             return True
         elif val > target:
-            col -= 1  # Eliminate this column
+            # Why `col -= 1`? Current value is too large.
+            # Every cell in this column below us is even larger (sorted).
+            # So the entire column is ruled out. Step left to a smaller column.
+            col -= 1
         else:
-            row += 1  # Eliminate this row
+            # Why `row += 1`? Current value is too small.
+            # Every cell in this row to our left is even smaller (sorted).
+            # So the entire row is ruled out. Step down to a larger row.
+            row += 1
 
     return False
 ```
@@ -1210,18 +1333,30 @@ def diffWaysToCompute(expression: str) -> list[int]:
     memo = {}
 
     def compute(expr):
+        # Why check memo first?
+        # The same subexpression (e.g., "3-4") appears many times as you split
+        # "2*3-4*5" at different operators. Without memoization, you recompute
+        # "3-4" independently for each split point that produces it — the total
+        # work grows as the Catalan number (exponential). With memo: compute once,
+        # reuse everywhere. This is D&C + memoization = essentially top-down DP.
         if expr in memo:
             return memo[expr]
 
         results = []
 
         for i, ch in enumerate(expr):
+            # Why `ch in '+-*'`?
+            # Operators are the only valid split points. Splitting inside a
+            # multi-digit number (e.g., splitting "23" into "2" and "3") would
+            # create two separate numbers that were meant to be one — wrong.
+            # Each operator is a "parenthesization boundary": (left_expr) op (right_expr).
             if ch in '+-*':
-                # Split at operator
                 left_results = compute(expr[:i])
                 right_results = compute(expr[i + 1:])
 
-                # Combine all left results with all right results
+                # Combine every left result with every right result.
+                # Why every pair? Because each is a DIFFERENT way to parenthesize
+                # the sub-expression. All combinations are valid distinct results.
                 for l in left_results:
                     for r in right_results:
                         if ch == '+':
@@ -1231,7 +1366,10 @@ def diffWaysToCompute(expression: str) -> list[int]:
                         else:
                             results.append(l * r)
 
-        # Base case: no operators found, it's a number
+        # Why `if not results`?
+        # If we never entered the loop (no operators found), the expression is a
+        # single number like "23" or "5". There's no split point — it's the base
+        # case. Convert the string to an integer and return it as the only result.
         if not results:
             results.append(int(expr))
 
@@ -1296,6 +1434,12 @@ def kClosest(points: list[list[int]], k: int) -> list[list[int]]:
         return point[0] ** 2 + point[1] ** 2
 
     def quick_select(pts, k):
+        # Why `len(pts) <= k`?
+        # If we have FEWER points than k, every point is among the k closest
+        # by definition — return them all. This also handles the base case
+        # where recursion has narrowed pts to exactly 1 element.
+        # Without this guard, we'd compute a pivot from a list smaller than k
+        # and index into lows/mids/highs incorrectly.
         if len(pts) <= k:
             return pts
 
@@ -1304,10 +1448,21 @@ def kClosest(points: list[list[int]], k: int) -> list[list[int]]:
         mids = [p for p in pts if dist(p) == pivot]
         highs = [p for p in pts if dist(p) > pivot]
 
+        # Why `k <= len(lows)` (using `<=` not `<`)?
+        # lows contains points at positions 0..len(lows)-1 by distance rank.
+        # If k <= len(lows), all k closest points live inside lows — recurse there.
+        # We want the k closest (indices 0..k-1), and lows has at least k of them.
         if k <= len(lows):
             return quick_select(lows, k)
+        # Why `k <= len(lows) + len(mids)`?
+        # All points in lows ARE closer than the pivot. All points in mids ARE
+        # the pivot distance. If k falls within lows + mids, we've already
+        # found all points closer than the pivot — take all of lows plus
+        # however many mids we need to reach exactly k.
         elif k <= len(lows) + len(mids):
             return lows + mids[:k - len(lows)]
+        # k exceeds lows + mids: we must also include some highs.
+        # Subtract the sizes of lows and mids so k is relative to highs.
         else:
             return lows + mids + quick_select(highs, k - len(lows) - len(mids))
 
@@ -1361,7 +1516,14 @@ def mergeKLists(lists: list[ListNode]) -> ListNode:
         """Merge two sorted linked lists."""
         dummy = ListNode(0)
         curr = dummy
+        # Why `while l1 and l2` (both, not one)?
+        # We compare l1.val and l2.val each step. If either is None (exhausted),
+        # there's nothing to compare — we break out and drain the remainder.
         while l1 and l2:
+            # Why `l1.val <= l2.val` (using `<=`, not `<`)?
+            # When values are equal, taking from l1 first keeps the merge STABLE
+            # (preserves original ordering of equal elements). Changing to `<`
+            # would take from l2 when equal — still correct but unstable.
             if l1.val <= l2.val:
                 curr.next = l1
                 l1 = l1.next
@@ -1369,11 +1531,20 @@ def mergeKLists(lists: list[ListNode]) -> ListNode:
                 curr.next = l2
                 l2 = l2.next
             curr = curr.next
+        # Why `curr.next = l1 if l1 else l2`?
+        # When the while loop ends, exactly one list still has elements remaining.
+        # Those elements are already sorted AND are all greater than everything
+        # placed so far (since both input lists were sorted). Attach the remainder
+        # directly — no need to traverse it node by node.
         curr.next = l1 if l1 else l2
         return dummy.next
 
     def merge_lists(lists, lo, hi):
         """D&C: merge lists[lo..hi] by splitting in half."""
+        # Why `lo == hi`?
+        # One list remains in the range — it's already "merged" (nothing to pair
+        # it with). Return it directly as the base case.
+        # If we didn't check this, we'd compute mid == lo and recurse infinitely.
         if lo == hi:
             return lists[lo]
         mid = (lo + hi) // 2
@@ -1414,8 +1585,12 @@ def closest_pair(points: list[tuple[int, int]]) -> float:
 
     def solve(pts_x, pts_y):
         n = len(pts_x)
+        # Why brute force when `n <= 3`?
+        # With 3 or fewer points, there are at most 3 pairs to check — no benefit
+        # to dividing further. More importantly, dividing 3 points gives halves of
+        # size 1 and 2 — the size-1 side returns immediately with no pair found.
+        # Brute force here keeps the recursion clean and avoids degenerate splits.
         if n <= 3:
-            # Brute force for small inputs
             min_d = float('inf')
             for i in range(n):
                 for j in range(i + 1, n):
@@ -1425,13 +1600,15 @@ def closest_pair(points: list[tuple[int, int]]) -> float:
         mid = n // 2
         mid_x = pts_x[mid][0]
 
-        # Split points sorted by y into left and right
         left_x = pts_x[:mid]
         right_x = pts_x[mid:]
         left_y = [p for p in pts_y if p[0] <= mid_x]
         right_y = [p for p in pts_y if p[0] > mid_x]
 
-        # Fix: ensure split is correct even with duplicate x-coords
+        # Why correct for duplicate x-coordinates?
+        # If multiple points share mid_x, they all go to left_y (because of <=).
+        # This can make left_y larger than left_x, breaking the size invariant.
+        # We move the excess to right_y so both halves have exactly the right count.
         if len(left_y) > len(left_x):
             excess = len(left_y) - len(left_x)
             right_y = left_y[-excess:] + right_y
@@ -1441,11 +1618,20 @@ def closest_pair(points: list[tuple[int, int]]) -> float:
         d_right = solve(right_x, right_y)
         d = min(d_left, d_right)
 
-        # Check strip: points within d of the dividing line
+        # Why only check points within distance `d` of the dividing line?
+        # Any pair with one point more than d away from the line has x-distance > d,
+        # so their total distance > d — they can't improve our best answer.
+        # Only points in this "strip" can possibly form a closer pair.
         strip = [p for p in pts_y if abs(p[0] - mid_x) < d]
 
         for i in range(len(strip)):
             j = i + 1
+            # Why `strip[j][1] - strip[i][1]) < d` (y-distance only)?
+            # The strip is sorted by y-coordinate (pts_y was pre-sorted by y).
+            # Once a strip point's y-coordinate exceeds strip[i]'s y by d,
+            # their Euclidean distance is already > d — stop checking further.
+            # Key theorem: at most 8 points can fit in any d×2d strip rectangle,
+            # so this inner while loop runs at most 7 iterations per i → O(n) total.
             while j < len(strip) and (strip[j][1] - strip[i][1]) < d:
                 d = min(d, dist(strip[i], strip[j]))
                 j += 1
@@ -1989,6 +2175,55 @@ Case 3: d < log_b(a) → O(n^(log_b(a)))
 4. If combining is not cheap, consider whether a different split strategy helps
 5. If subproblems overlap, pivot to Dynamic Programming
 6. Remember: D&C problems often have elegant O(n log n) solutions hiding behind O(n^2) brute force
+
+---
+
+## Appendix: Conditional Quick Reference
+
+This table lists every key condition used in this handbook, its plain-English meaning, and the intuition behind it.
+
+### A. Base Case & Termination Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if len(arr) <= 1` | "0 or 1 elements — already solved" | Single element is trivially sorted/selected. Using `<= 1` catches both empty and singleton; `== 0` would miss the singleton and loop infinitely on a 1-element array |
+| `if lo > hi` (tree build) | "Index range is empty — no node here" | `lo == hi` means exactly one element (a leaf). `lo > hi` means the range has collapsed past that leaf — return None. Using `>= hi` would skip valid leaf nodes |
+| `if lo == hi` (quick select / merge k lists) | "Only one candidate / one list left" | In quick select, one element must be the answer. In merge k lists, one list has nothing to merge with — return it directly |
+| `if in_lo > in_hi` (tree from traversal) | "Inorder range is empty — no subtree here" | If empty, don't consume the next traversal element as a phantom root. Consuming it would shift all subsequent roots one position left, corrupting the entire tree |
+| `if n <= 3` (closest pair) | "Brute force the tiny base case" | Dividing 3 points gives halves of 1 and 2 — no efficiency gain. With ≤3 points there are ≤3 pairs; checking all is O(1). Going smaller would degenerate the strip-check logic |
+| `if len(pts) <= k` (k closest) | "Fewer points than k — all qualify" | If we have fewer candidates than k, every one is among the k closest. Also catches the single-element base case implicitly |
+
+### B. Partition & Selection Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if k < len(lows)` (quick select) | "kth position lives entirely within the smaller elements" | lows occupies positions 0..len(lows)-1. Strict `<` means k falls inside that range (not on the boundary). k == len(lows) would land in pivots |
+| `elif k < len(lows) + len(pivots)` | "kth position lands on a pivot value" | All pivots are identical, so any of them is the answer. The range [len(lows), len(lows)+len(pivots)-1] belongs to the pivot group |
+| `if k <= len(lows)` (k closest, `<=` not `<`) | "k closest all live among the smaller distances" | We want positions 0..k-1. If k ≤ len(lows), lows contains at least k points — recurse there. Using `<` would miss the case k == len(lows) |
+| `elif k <= len(lows) + len(mids)` | "k lands in the equal-distance group" | All mids are the same distance. Take all of lows plus exactly (k - len(lows)) from mids to reach k total |
+| `if store == k_smallest` (in-place quick select) | "Pivot landed exactly at the kth boundary" | Everything right of `store` is at least as frequent; exactly k elements are on the right. Done — no further recursion needed |
+
+### C. Merge & Combine Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `while i < len(left) and j < len(right)` | "Both sides still have elements to compare" | Comparison requires two operands. Once either side is exhausted, the other is already sorted and greater than everything placed — append it directly |
+| `if left[i] <= right[j]` (stable sort) | "Left wins ties" | `<=` takes from left when equal, preserving original relative order of equal elements (stability). Changing to `<` makes the sort unstable |
+| `root.right = build(...); root.left = build(...)` (postorder) | "Build right subtree before left" | Postorder is left→right→ROOT. Consuming from the END gives ROOT, then right root, then left root. Building right first matches this consumption order |
+| `if ch in '+-*'` (expression D&C) | "Only split at operators, never inside numbers" | Splitting inside "23" would create phantom numbers "2" and "3". Operators are the only valid parenthesization boundaries |
+| `if not results` (expression base case) | "No operators found — this IS a number" | A sub-expression with no operators is a raw integer literal. `int(expr)` converts it. Without this, expressions like "5" would return an empty list |
+| `curr.next = l1 if l1 else l2` (linked list merge) | "Attach the non-exhausted remainder directly" | The remaining nodes are already sorted and all larger than everything placed. No need to traverse — O(1) tail attachment instead of O(n) node-by-node copy |
+
+### D. Binary Search & Elimination Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if len(nums1) > len(nums2): swap` (median) | "Binary search on the shorter array" | Binary searching m gives O(log m). Always searching the shorter array gives O(log(min(m,n))). Without the swap, we'd do unnecessary O(log(max(m,n))) work |
+| `while lo <= hi` (median binary search) | "Search range is non-empty" | `lo == hi` still represents one valid partition count to check. `lo > hi` means we've exhausted all partitions — target not found |
+| `if left1 <= right2 and left2 <= right1` | "Every left-side element ≤ every right-side element" | This is the partition correctness invariant. Both cross-comparisons are needed because elements interleave from two different arrays. If both hold, the median is at this partition |
+| `elif left1 > right2: hi = i - 1` | "Too many elements from nums1 on the left" | left1 is too large — we included too much of nums1. Shrink the nums1 partition by moving hi left |
+| `while row < rows and col >= 0` (2D matrix) | "Still inside the search zone" | row == rows: fallen off the bottom. col < 0: fallen off the left. Either exit means target is absent — the top-right staircase walk has covered all reachable cells |
+| `while j < len(strip) and (strip[j][1] - strip[i][1]) < d` | "Only check strip points within y-distance d" | Strip is y-sorted. Once y-gap ≥ d, Euclidean distance > d regardless of x — skip. Proven at most 8 points fit in a d×2d box, so inner loop runs ≤7 times → O(n) strip total |
 
 **D&C vs Other Paradigms:**
 - **D&C vs DP:** D&C has independent subproblems; DP has overlapping ones. If you find yourself recomputing the same subproblem, add memoization (turning D&C into DP).

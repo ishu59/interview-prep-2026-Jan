@@ -503,12 +503,17 @@ def islandPerimeter(grid: list[list[int]]) -> int:
     for r in range(rows):
         for c in range(cols):
             if grid[r][c] == 1:
-                # Start with 4 sides
+                # Why start with 4? Every land cell is a square with 4 sides.
+                # Each side touching another land cell is NOT perimeter (shared edge).
+                # So: perimeter contribution = 4 - (number of land neighbors).
                 perimeter += 4
 
                 # Subtract shared edges with neighbors
                 for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
                     nr, nc = r + dr, c + dc
+                    # Why subtract 1 for each land neighbor?
+                    # A shared edge between two land cells is interior, not perimeter.
+                    # Boundary cells or water neighbors keep that side as perimeter.
                     if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 1:
                         perimeter -= 1
 
@@ -565,7 +570,12 @@ def numDistinctIslands(grid: list[list[int]]) -> int:
         dfs(r, c + 1, path, 'R')  # Right
         dfs(r, c - 1, path, 'L')  # Left
 
-        path.append('B')  # Backtrack marker
+        # Why append a backtrack marker 'B'?
+        # Without it, different shapes can produce the same direction sequence.
+        # Example: an L-shape "DRB" vs a straight line "DR" — the 'B' records
+        # WHERE we backtracked, which encodes the shape's structure.
+        # Think of it like parentheses in math: (D(R)B) vs (DR) are different.
+        path.append('B')
 
     for r in range(rows):
         for c in range(cols):
@@ -630,17 +640,27 @@ def orangesRotting(grid: list[list[int]]) -> int:
     directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
     minutes = 0
 
+    # Why `fresh > 0` in addition to `while queue`?
+    # Optimization: once all fresh oranges are rotten, stop immediately.
+    # Without it, BFS would keep running through remaining queued rotten cells.
     while queue and fresh > 0:
         minutes += 1
-        for _ in range(len(queue)):  # Process one level
+        # Why `range(len(queue))`? This is the "level snapshot" trick:
+        # Process exactly the cells at the CURRENT minute, not the newly
+        # rotten ones we're adding. Each full level = one minute passing.
+        for _ in range(len(queue)):
             r, c = queue.popleft()
             for dr, dc in directions:
                 nr, nc = r + dr, c + dc
+                # Why `grid[nr][nc] == 1`? Only fresh (1) oranges can rot.
+                # Rotten (2) and empty (0) are skipped.
                 if 0 <= nr < rows and 0 <= nc < cols and grid[nr][nc] == 1:
-                    grid[nr][nc] = 2  # Rot the orange
+                    grid[nr][nc] = 2  # Rot it (also marks as visited)
                     fresh -= 1
                     queue.append((nr, nc))
 
+    # Why check `fresh == 0`? If any fresh orange is unreachable from
+    # all rotten sources (isolated by empty cells), return -1.
     return minutes if fresh == 0 else -1
 ```
 
@@ -678,6 +698,8 @@ from collections import deque
 
 def shortestPathBinaryMatrix(grid: list[list[int]]) -> int:
     n = len(grid)
+    # Why check both corners? If START or END is blocked (1),
+    # no path can exist — fail fast before BFS.
     if grid[0][0] != 0 or grid[n - 1][n - 1] != 0:
         return -1
 
@@ -696,6 +718,12 @@ def shortestPathBinaryMatrix(grid: list[list[int]]) -> int:
 
         for dr, dc in directions:
             nr, nc = r + dr, c + dc
+            # Why FOUR conditions? Each filters a different invalid case:
+            # 1. Bounds: don't step off the grid
+            # 2. Not visited: don't revisit (infinite loop / wasted work)
+            # 3. grid == 0: only open cells are passable
+            # Early marking (add to visited NOW) ensures each cell is
+            # queued at most once — same principle as BFS Template A.
             if 0 <= nr < n and 0 <= nc < n and (nr, nc) not in visited and grid[nr][nc] == 0:
                 visited.add((nr, nc))
                 queue.append((nr, nc, length + 1))
@@ -740,13 +768,20 @@ def updateMatrix(mat: list[list[int]]) -> list[list[int]]:
             if mat[r][c] == 0:
                 queue.append((r, c))
             else:
-                mat[r][c] = float('inf')  # Mark as unvisited
+                mat[r][c] = float('inf')  # Not yet reached by BFS
 
     while queue:
         r, c = queue.popleft()
         for dr, dc in directions:
             nr, nc = r + dr, c + dc
             if 0 <= nr < rows and 0 <= nc < cols:
+                # Why `> mat[r][c] + 1` instead of a visited set?
+                # This serves DOUBLE duty:
+                # 1. "Visited" check: if distance is already optimal (≤ current+1),
+                #    the condition is false → we skip it.
+                # 2. Distance update: if we found a shorter path, update and re-queue.
+                # For standard BFS on unweighted grids, each cell is updated at most
+                # once, so this is equivalent to a visited set but simpler.
                 if mat[nr][nc] > mat[r][c] + 1:
                     mat[nr][nc] = mat[r][c] + 1
                     queue.append((nr, nc))
@@ -807,8 +842,12 @@ Start at (1,1), original color = 1, new color = 2:
 ```python
 def floodFill(image: list[list[int]], sr: int, sc: int, color: int) -> list[list[int]]:
     original = image[sr][sc]
+    # Why this early return? If new color == original color, every cell we
+    # visit is ALREADY the target color. We'd never stop exploring because
+    # `image[r][c] != original` would never be true after coloring.
+    # Result: infinite recursion / stack overflow. This guard prevents it.
     if original == color:
-        return image  # No change needed, avoids infinite loop
+        return image
 
     rows, cols = len(image), len(image[0])
 
@@ -856,26 +895,36 @@ def solve(board: list[list[str]]) -> None:
 
     rows, cols = len(board), len(board[0])
 
+    # KEY INSIGHT: "Find surrounded O's" is hard. Instead, flip the question:
+    # "Find UN-surrounded O's" — those touching the border. Mark them safe,
+    # then everything else must be surrounded. Like finding dry land by
+    # marking everything the ocean touches, then flooding the rest.
     def dfs(r, c):
         if r < 0 or r >= rows or c < 0 or c >= cols:
             return
+        # Why `!= 'O'`? Stop at 'X' (walls) AND 'E' (already marked safe).
+        # Without the 'E' check, we'd revisit safe cells infinitely.
         if board[r][c] != 'O':
             return
 
-        board[r][c] = 'E'  # Mark as escaped (safe)
+        board[r][c] = 'E'  # 'E' = Escaped (connected to border = safe)
 
         for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
             dfs(r + dr, c + dc)
 
-    # Step 1: Mark all O's connected to border as escaped
+    # Step 1: DFS from ALL border cells. Any 'O' reachable from
+    # the border is NOT surrounded — mark it 'E' (escaped).
     for r in range(rows):
-        dfs(r, 0)
-        dfs(r, cols - 1)
+        dfs(r, 0)          # Left edge
+        dfs(r, cols - 1)   # Right edge
     for c in range(cols):
-        dfs(0, c)
-        dfs(rows - 1, c)
+        dfs(0, c)          # Top edge
+        dfs(rows - 1, c)   # Bottom edge
 
-    # Step 2: Capture surrounded O's and restore escaped ones
+    # Step 2: Three-way conversion:
+    # 'O' → 'X': NOT connected to border = surrounded = captured
+    # 'E' → 'O': WAS connected to border = safe = restore
+    # 'X' stays 'X': was always a wall
     for r in range(rows):
         for c in range(cols):
             if board[r][c] == 'O':
@@ -925,11 +974,18 @@ def pacificAtlantic(heights: list[list[int]]) -> list[list[int]]:
     pacific = set()
     atlantic = set()
 
+    # KEY TRICK: Checking "can water from cell X reach the ocean?" for every
+    # cell is expensive. Instead, reverse the flow: start FROM each ocean
+    # and flow UPHILL. Any cell reachable by uphill flow can drain to that ocean.
     def dfs(r, c, visited, prev_height):
         if (r, c) in visited:
             return
         if r < 0 or r >= rows or c < 0 or c >= cols:
             return
+        # Why `< prev_height`? We're flowing UPHILL (reverse of water flow).
+        # Water flows high→low, so reverse = we can only step to cells that
+        # are >= our current height. If the neighbor is LOWER, water couldn't
+        # have flowed FROM there to us, so we can't reach it going backward.
         if heights[r][c] < prev_height:
             return
 
@@ -938,6 +994,8 @@ def pacificAtlantic(heights: list[list[int]]) -> list[list[int]]:
         for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
             dfs(r + dr, c + dc, visited, heights[r][c])
 
+    # Why start with prev_height=0? Ocean level is 0, and any land cell
+    # height ≥ 0, so the first step from the edge always succeeds.
     # DFS from Pacific edges (top row and left column)
     for c in range(cols):
         dfs(0, c, pacific, 0)
@@ -950,7 +1008,7 @@ def pacificAtlantic(heights: list[list[int]]) -> list[list[int]]:
     for r in range(rows):
         dfs(r, cols - 1, atlantic, 0)
 
-    # Return intersection
+    # Intersection: cells reachable from BOTH oceans = can drain to both.
     return [[r, c] for r, c in pacific & atlantic]
 ```
 
@@ -995,11 +1053,19 @@ def rotate(matrix: list[list[int]]) -> None:
     n = len(matrix)
 
     # Step 1: Transpose (swap across main diagonal)
+    # Why `j in range(i + 1, n)` and not `range(n)`?
+    # We only swap ABOVE the diagonal. If we iterated all (i,j),
+    # we'd swap each pair twice → back to the original! Starting
+    # at i+1 means each (i,j)↔(j,i) pair is swapped exactly once.
     for i in range(n):
         for j in range(i + 1, n):
             matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]
 
     # Step 2: Reverse each row
+    # Why does transpose + reverse = 90° clockwise rotation?
+    # Transpose moves element (r,c) to (c,r). Reversing the row then
+    # moves it to (c, n-1-r). Combined: (r,c) → (c, n-1-r), which
+    # IS the formula for 90° clockwise rotation.
     for i in range(n):
         matrix[i].reverse()
 ```
@@ -1045,24 +1111,35 @@ def spiralOrder(matrix: list[list[int]]) -> list[int]:
     top, bottom = 0, len(matrix) - 1
     left, right = 0, len(matrix[0]) - 1
 
+    # Why `top <= bottom AND left <= right`?
+    # We peel off one layer of the spiral each iteration. When the
+    # boundaries cross (top > bottom or left > right), the entire
+    # matrix has been consumed. Both conditions needed because the
+    # matrix may be non-square (e.g., 1×4 runs out of rows first).
     while top <= bottom and left <= right:
         # Traverse right along top row
         for c in range(left, right + 1):
             result.append(matrix[top][c])
-        top += 1
+        top += 1  # Top row consumed, shrink inward
 
         # Traverse down along right column
         for r in range(top, bottom + 1):
             result.append(matrix[r][right])
-        right -= 1
+        right -= 1  # Right column consumed, shrink inward
 
-        # Traverse left along bottom row (if still valid)
+        # Traverse left along bottom row
+        # Why `if top <= bottom`? After moving top down, the top and bottom
+        # might have crossed — meaning there's no bottom row left to traverse.
+        # Without this check, a single-row matrix would double-count.
         if top <= bottom:
             for c in range(right, left - 1, -1):
                 result.append(matrix[bottom][c])
             bottom -= 1
 
-        # Traverse up along left column (if still valid)
+        # Traverse up along left column
+        # Why `if left <= right`? Same idea — after moving right inward,
+        # there might be no left column remaining. A single-column matrix
+        # would double-count without this guard.
         if left <= right:
             for r in range(bottom, top - 1, -1):
                 result.append(matrix[r][left])
@@ -1178,10 +1255,18 @@ Final:
 
 ```python
 def uniquePaths(m: int, n: int) -> int:
+    # Why initialize entire grid to 1? The first row and first column
+    # each have exactly ONE path (all-right or all-down). Setting them
+    # to 1 is the base case. We only need to compute the interior cells.
     dp = [[1] * n for _ in range(m)]
 
+    # Why start at (1,1)? Row 0 and col 0 are already correct (all 1s).
     for r in range(1, m):
         for c in range(1, n):
+            # Why `dp[r-1][c] + dp[r][c-1]`?
+            # You can only arrive from ABOVE or from the LEFT (no diagonal,
+            # no going up/left). So total paths to (r,c) = paths that came
+            # from above + paths that came from the left.
             dp[r][c] = dp[r - 1][c] + dp[r][c - 1]
 
     return dp[m - 1][n - 1]
@@ -1235,27 +1320,31 @@ dp table:
 def uniquePathsWithObstacles(obstacleGrid: list[list[int]]) -> int:
     m, n = len(obstacleGrid), len(obstacleGrid[0])
 
+    # If start or end is blocked, no path exists.
     if obstacleGrid[0][0] == 1 or obstacleGrid[m - 1][n - 1] == 1:
         return 0
 
     dp = [[0] * n for _ in range(m)]
     dp[0][0] = 1
 
-    # First column
+    # First column: each cell reachable only from above.
+    # Why `dp[r-1][0]` (not just 1)? Once you hit an obstacle,
+    # all cells BELOW it in the first column become unreachable (0).
+    # dp propagates: 1, 1, 1, 0(obstacle), 0, 0, 0...
     for r in range(1, m):
         dp[r][0] = dp[r - 1][0] if obstacleGrid[r][0] == 0 else 0
 
-    # First row
+    # First row: same logic, but obstacles block everything to the RIGHT.
     for c in range(1, n):
         dp[0][c] = dp[0][c - 1] if obstacleGrid[0][c] == 0 else 0
 
-    # Fill rest
+    # Fill rest: same as Unique Paths, but obstacles get dp = 0.
     for r in range(1, m):
         for c in range(1, n):
             if obstacleGrid[r][c] == 0:
                 dp[r][c] = dp[r - 1][c] + dp[r][c - 1]
             else:
-                dp[r][c] = 0
+                dp[r][c] = 0  # Obstacle: no paths go through here
 
     return dp[m - 1][n - 1]
 ```
@@ -1294,15 +1383,20 @@ def minPathSum(grid: list[list[int]]) -> int:
     dp = [[0] * n for _ in range(m)]
     dp[0][0] = grid[0][0]
 
-    # First row: can only come from left
+    # Why accumulate prefix sums for first row/col?
+    # First row cells are only reachable from the left (can't come from above).
+    # First col cells are only reachable from above (can't come from the left).
+    # No choice = just add: dp[0][c] = dp[0][c-1] + grid[0][c].
     for c in range(1, n):
         dp[0][c] = dp[0][c - 1] + grid[0][c]
 
-    # First column: can only come from above
     for r in range(1, m):
         dp[r][0] = dp[r - 1][0] + grid[r][0]
 
-    # Fill rest
+    # Why `grid[r][c] + min(dp[r-1][c], dp[r][c-1])`?
+    # You can only arrive from ABOVE (dp[r-1][c]) or from the LEFT (dp[r][c-1]).
+    # Take the cheaper route, then add the current cell's cost.
+    # It's like GPS: always enter this intersection via the cheaper road.
     for r in range(1, m):
         for c in range(1, n):
             dp[r][c] = grid[r][c] + min(dp[r - 1][c], dp[r][c - 1])
@@ -1365,9 +1459,18 @@ def maximalSquare(matrix: list[list[str]]) -> int:
     for r in range(m):
         for c in range(n):
             if matrix[r][c] == '1':
+                # Why separate first row/column? They can only form 1×1 squares
+                # (no room for a larger square above or to the left).
                 if r == 0 or c == 0:
                     dp[r][c] = 1
                 else:
+                    # Why min of THREE neighbors + 1?
+                    # To form a k×k square ending at (r,c), you need:
+                    #   - A (k-1)×(k-1) square ending at (r-1,c)   [top]
+                    #   - A (k-1)×(k-1) square ending at (r,c-1)   [left]
+                    #   - A (k-1)×(k-1) square ending at (r-1,c-1) [diagonal]
+                    # The SMALLEST of these three limits your square size.
+                    # Like building a box: the shortest wall determines the height.
                     dp[r][c] = min(dp[r - 1][c], dp[r][c - 1], dp[r - 1][c - 1]) + 1
                 max_side = max(max_side, dp[r][c])
 
@@ -1414,9 +1517,15 @@ def searchMatrix(matrix: list[list[int]], target: int) -> bool:
 
     while lo <= hi:
         mid = (lo + hi) // 2
+        # Why `mid // cols` and `mid % cols`?
+        # Imagine unrolling the matrix into one long array of length rows*cols.
+        # Index `mid` in that array maps to: row = mid ÷ cols (which "row chunk"),
+        # col = mid mod cols (position within that row).
+        # Example: cols=4, mid=6 → row=6//4=1, col=6%4=2 → matrix[1][2].
         r, c = mid // cols, mid % cols
         val = matrix[r][c]
 
+        # Standard binary search: adjust bounds based on comparison.
         if val == target:
             return True
         elif val < target:
@@ -1467,15 +1576,24 @@ def searchMatrix(matrix: list[list[int]], target: int) -> bool:
         return False
 
     rows, cols = len(matrix), len(matrix[0])
-    r, c = 0, cols - 1  # Start at top-right corner
+    # Why start at TOP-RIGHT (not top-left or bottom-right)?
+    # Top-right is the only corner where ONE move eliminates an entire row or column:
+    # - current > target → move LEFT (every cell below this column is also > target: all eliminated)
+    # - current < target → move DOWN (every cell left in this row is also < target: all eliminated)
+    # Top-left has two "greater" directions (right and down) — no clear elimination.
+    # Bottom-right has two "smaller" directions (left and up) — same problem.
+    r, c = 0, cols - 1
 
+    # Why `r < rows AND c >= 0`?
+    # r < rows: we haven't fallen off the bottom. c >= 0: we haven't fallen off the left.
+    # Either exit means we've searched all reachable cells.
     while r < rows and c >= 0:
         if matrix[r][c] == target:
             return True
         elif matrix[r][c] > target:
-            c -= 1  # Eliminate this column
+            c -= 1  # Too big → move left (eliminate this entire column below us)
         else:
-            r += 1  # Eliminate this row
+            r += 1  # Too small → move down (eliminate this entire row to our left)
 
     return False
 ```
@@ -1536,23 +1654,34 @@ def gameOfLife(board: list[list[int]]) -> None:
 
     for r in range(rows):
         for c in range(cols):
-            # Count live neighbors using original state (bit 0)
             live_neighbors = 0
             for dr, dc in directions:
                 nr, nc = r + dr, c + dc
                 if 0 <= nr < rows and 0 <= nc < cols:
+                    # Why `board[nr][nc] & 1` instead of just `board[nr][nc]`?
+                    # We use bit 0 to store the ORIGINAL state. Cells already processed
+                    # may have had bit 1 set (new state), making them 2 or 3.
+                    # `& 1` masks away bit 1, recovering the original 0 or 1.
+                    # Without this, a neighbor value of 2 (was alive, now dead) would
+                    # be counted as 2 live neighbors — completely wrong!
                     live_neighbors += board[nr][nc] & 1
 
-            # Apply rules: encode new state in bit 1
-            if board[r][c] & 1:  # Currently alive
+            # Why `board[r][c] & 1` to check current state?
+            # Same reason: bit 0 is original alive/dead. We haven't touched this cell
+            # yet in this pass, but we use & 1 for consistency and safety.
+            if board[r][c] & 1:  # Originally alive
                 if live_neighbors in (2, 3):
+                    # Why `|= 2`? We're setting bit 1 (value 2) to record "new state = alive".
+                    # Bit 0 still holds the original state. The cell is now 1|2 = 3.
                     board[r][c] |= 2  # Stays alive → set bit 1
-                # else: dies → bit 1 stays 0
-            else:  # Currently dead
+                # else: underpopulation or overpopulation → bit 1 stays 0 (dies)
+            else:  # Originally dead
                 if live_neighbors == 3:
-                    board[r][c] |= 2  # Becomes alive → set bit 1
+                    board[r][c] |= 2  # Becomes alive → bit 1 = 1, cell becomes 0|2 = 2
 
-    # Final pass: shift to get new state
+    # Why `>>= 1`? This shifts all bits right by 1, discarding bit 0 (old state)
+    # and moving bit 1 (new state) into bit 0. Result: 0→0, 1→0, 2→1, 3→1.
+    # Old cells that died (were 1, bit1=0) become 0. New cells (bit1=1) become 1.
     for r in range(rows):
         for c in range(cols):
             board[r][c] >>= 1
@@ -1593,8 +1722,17 @@ def isValidSudoku(board: list[list[str]]) -> bool:
             if val == '.':
                 continue
 
+            # Why `(r // 3) * 3 + (c // 3)`?
+            # The 9×9 board has 9 boxes arranged in a 3×3 grid of boxes.
+            # `r // 3` gives the BOX ROW (0, 1, or 2). Multiply by 3 to get
+            # the starting index for that box row (0, 3, or 6).
+            # `c // 3` gives the BOX COLUMN (0, 1, or 2) — add it as offset.
+            # Example: cell (4, 7) → box row = 4//3=1, box col = 7//3=2 → box 1*3+2 = 5.
             box_idx = (r // 3) * 3 + (c // 3)
 
+            # Why check all THREE (row, col, box) before adding?
+            # A digit can violate the row constraint, the col constraint, OR the box
+            # constraint independently. One check failing is enough to return False.
             if val in rows[r] or val in cols[c] or val in boxes[box_idx]:
                 return False
 
@@ -1646,7 +1784,10 @@ def setZeroes(matrix: list[list[int]]) -> None:
     first_row_zero = False
     first_col_zero = False
 
-    # Check if first row/col have zeros
+    # Why save first row/col state BEFORE using them as markers?
+    # We're about to overwrite matrix[r][0] and matrix[0][c] with 0s as "flags".
+    # If row 0 or col 0 already had a 0, we need to know that BEFORE the marking
+    # phase corrupts that info. Record it now, apply it last.
     for c in range(cols):
         if matrix[0][c] == 0:
             first_row_zero = True
@@ -1657,25 +1798,33 @@ def setZeroes(matrix: list[list[int]]) -> None:
             first_col_zero = True
             break
 
-    # Use first row/col as markers for rest of matrix
+    # Why start at range(1, rows) and range(1, cols)?
+    # We're USING row 0 and col 0 as our marker storage. If we started at 0,
+    # we'd be both reading and writing the markers simultaneously — corrupting them.
+    # Skip first row and first column; handle them separately with flags above.
     for r in range(1, rows):
         for c in range(1, cols):
             if matrix[r][c] == 0:
+                # Mark: row r needs zeroing (set its first-col marker).
+                # Mark: col c needs zeroing (set its first-row marker).
                 matrix[r][0] = 0
                 matrix[0][c] = 0
 
-    # Zero out cells based on markers
+    # Why `matrix[r][0] == 0 OR matrix[0][c] == 0`?
+    # A cell (r, c) should be zeroed if EITHER its row was marked (by a zero anywhere
+    # in that row) OR its column was marked (by a zero anywhere in that column).
     for r in range(1, rows):
         for c in range(1, cols):
             if matrix[r][0] == 0 or matrix[0][c] == 0:
                 matrix[r][c] = 0
 
-    # Handle first row
+    # Why handle first row/col LAST?
+    # If we zeroed them first, their cells would become 0 and incorrectly mark
+    # other rows/cols. Apply the saved flags only after all other cells are done.
     if first_row_zero:
         for c in range(cols):
             matrix[0][c] = 0
 
-    # Handle first column
     if first_col_zero:
         for r in range(rows):
             matrix[r][0] = 0
@@ -2228,3 +2377,72 @@ Where R = rows, C = columns, N = side length (for square matrices).
 9. Try LC 329 (combines DFS + memoization on grid -- hard)
 
 Good luck with your interview preparation!
+
+---
+
+## Appendix: Conditional Quick Reference
+
+This table lists every key condition used in this handbook, its plain-English meaning, and the intuition behind it.
+
+### A. Bounds & Traversal Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `0 <= nr < rows and 0 <= nc < cols` | "This cell is inside the grid" | Lower bound prevents negative indices; upper bound (strict `<`) prevents index == length (off-by-one) |
+| `while lo <= hi` (binary search) | "Search range is non-empty" | `lo > hi` means the range collapsed — target not found |
+| `while r < rows and c >= 0` (staircase) | "Still inside the top-right search zone" | r falls off bottom when we exhaust rows; c falls off left when we exhaust cols |
+| `while top <= bottom and left <= right` (spiral) | "Boundary still has cells to visit" | When top > bottom or left > right, the layers have met — done |
+
+### B. BFS / DFS Visit Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `(nr, nc) not in visited` | "Haven't been here before" | Prevents infinite loops between neighbors; mark BEFORE enqueuing |
+| `grid[nr][nc] != WALL` | "This cell is passable" | Only enqueue cells we can actually traverse |
+| `if original == color` (flood fill) | "Starting cell is same as fill color" | If already the target color, doing fill would overwrite then re-fill forever |
+| `if r < 0 or r >= rows or c < 0 or c >= cols: return` (DFS base) | "Stepped outside grid — stop" | Early exit at boundary avoids index errors |
+| `if grid[r][c] != TARGET: return` (DFS base) | "Wrong cell type — don't explore" | Only continues DFS into cells that belong to the current region |
+
+### C. BFS Level / Multi-Source Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `while queue and fresh > 0` (rotting oranges) | "Still oranges to rot AND unrotted oranges remain" | Short-circuits once all fresh oranges are already rotted — avoids extra empty iterations |
+| `for _ in range(len(queue))` (level BFS) | "Process exactly this layer" | Snapshot of current layer size; new cells added don't get processed until next minute |
+| `dist[nr][nc] > dist[r][c] + 1` (01 matrix) | "Found a shorter route to this cell" | Standard relaxation: only update if new path is strictly shorter |
+
+### D. DFS Boundary Flood (Surrounded Regions / Pacific Atlantic)
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `r == 0 or r == rows-1 or c == 0 or c == cols-1` | "This cell is on the border" | Only border cells can "escape" — start DFS from them to mark safe regions |
+| `height[nr][nc] >= prev_height` (Pacific/Atlantic) | "Water can flow uphill in reverse" | We're doing reverse-flow: working from ocean back into land. Reverse-flow goes from low→high |
+| `if grid[r][c] == 'O': grid[r][c] = 'X'` | "Capture this unprotected region" | Any 'O' not reached by border DFS is surrounded; convert it now |
+
+### E. Matrix Transformation Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `for j in range(i+1, n)` (transpose) | "Swap each pair exactly once" | Starting from `i+1` prevents double-swapping — if we swapped (i,j) and (j,i) both, they'd cancel out |
+| `if top <= bottom` before bottom row (spiral) | "Bottom row hasn't merged with top row" | A single-row grid: after traversing top row, top > bottom. No bottom row to traverse |
+| `if left <= right` before left col (spiral) | "Left col hasn't merged with right col" | A single-col grid: after traversing right col, right < left. No left col to traverse |
+
+### F. Matrix DP Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `dp = [[1]*n for _ in range(m)]` (unique paths init) | "Every cell starts with 1 path" | First row and col each have exactly 1 path (only right or only down). Pre-filling avoids separate init loops |
+| `for r in range(1, m)` (DP main loop) | "Skip row 0 — already initialized" | Row 0 values are base cases; computing them again would incorrectly add 0 from above |
+| `r == 0 or c == 0` (maximal square edge) | "On the border — can only be a 1×1 square" | No cells above/left exist to form a larger square from; safe to cap at 1 |
+| `min(dp[r-1][c], dp[r][c-1], dp[r-1][c-1]) + 1` | "Size limited by shortest neighboring square" | To grow a k×k square, all three L-shaped neighbors must already have (k-1)×(k-1) squares |
+
+### G. Simulation / In-Place Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `board[nr][nc] & 1` | "Original alive/dead (ignore new state)" | Bit 0 = original state. `& 1` masks away bit 1 (new state) so already-updated cells don't corrupt neighbor counts |
+| `board[r][c] & 1` | "This cell was originally alive" | Same mask: read only the original state when deciding what rule applies |
+| `board[r][c] \|= 2` | "Record: new state = alive" | Sets bit 1 without touching bit 0 (original state). After the pass, bit 1 holds the new state |
+| `board[r][c] >>= 1` | "Commit: shift new state into bit 0" | Discards original state (bit 0), moves new state (bit 1) down. Values: 0→0, 1→0, 2→1, 3→1 |
+| `matrix[r][0] == 0 or matrix[0][c] == 0` (set zeroes) | "Row r or col c was flagged for zeroing" | Either marker being 0 means some cell in that row or col was originally 0 |
+| `(r // 3) * 3 + (c // 3)` (Sudoku box) | "Which of the 9 boxes does this cell belong to?" | Box row = `r//3` (0,1,2); box col = `c//3` (0,1,2); linear index = box_row * 3 + box_col |

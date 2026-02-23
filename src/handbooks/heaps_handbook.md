@@ -138,6 +138,10 @@ def top_k_largest(nums: list[int], k: int) -> list[int]:
         # Adding one more would make it k+1, so we switch to replace mode.
         if len(heap) < k:
             heapq.heappush(heap, num)
+        # Why `num > heap[0]`?
+        # heap[0] is the smallest of the k largest seen so far (the "gatekeeper").
+        # If the new number is larger, it deserves to be in the top-k and the
+        # current gatekeeper gets evicted. If it's smaller or equal, ignore it.
         elif num > heap[0]:  # Larger than smallest in top-k
             # heapreplace = pop + push in ONE sift (faster than separate calls).
             # Safe here because we already checked num > heap[0],
@@ -162,6 +166,10 @@ def top_k_smallest(nums: list[int], k: int) -> list[int]:
         # -heap[0] is the largest value currently in the "k smallest" set.
         if len(heap) < k:
             heapq.heappush(heap, -num)
+        # Why `num < -heap[0]`?
+        # -heap[0] is the largest element in our current k-smallest set (max-heap top).
+        # If the new number is smaller than that, it belongs in k-smallest and
+        # the current largest gets evicted. Without this check we'd never shrink.
         elif num < -heap[0]:  # Smaller than largest in top-k
             heapq.heapreplace(heap, -num)
 
@@ -187,7 +195,9 @@ def merge_k_sorted(lists: list[list[int]]) -> list[int]:
 
     # Initialize with first element from each list
     for i, lst in enumerate(lists):
-        # Skip empty lists to avoid index errors and empty heap entries.
+        # Why `if lst`?
+        # An empty list has no first element, so indexing lst[0] would crash.
+        # Skipping it simply means that source contributes zero elements.
         if lst:
             heapq.heappush(heap, (lst[0], i, 0))
 
@@ -232,6 +242,8 @@ class MedianFinder:
         # Step 1: Always add to small (lower half) first.
         # Why always small? This is a convention -- we arbitrarily
         # let small hold the extra element when count is odd.
+        # Why `-num`? Python only has min-heap. Storing negated values
+        # makes the min-heap behave as a max-heap (largest negated = smallest stored).
         heapq.heappush(self.small, -num)
 
         # Step 2: Move the largest of small to large.
@@ -243,6 +255,8 @@ class MedianFinder:
         # Why `len(large) > len(small)` and not `>=`?
         # We allow small to be 1 bigger (odd count), but large must
         # never be bigger than small. If it is, move one back.
+        # Example: after inserting 5 into [2|3, 4] the large side gains
+        # an extra element. This rebalance restores the invariant.
         if len(self.large) > len(self.small):
             heapq.heappush(self.small, -heapq.heappop(self.large))
 
@@ -250,6 +264,8 @@ class MedianFinder:
         # Why check `len(small) > len(large)`?
         # If odd count, small has the extra element -- that's the median.
         # If even count, average the two heap tops.
+        # Without this check we'd always average, giving a wrong answer
+        # for odd-length streams (e.g., reporting 3.5 instead of 3).
         if len(self.small) > len(self.large):
             return -self.small[0]
         return (-self.small[0] + self.large[0]) / 2
@@ -298,6 +314,10 @@ class LazyHeap:
         heapq.heappush(self.heap, val)
 
     def remove(self, val):
+        # Why increment a counter instead of actually removing from the heap?
+        # Heaps don't support arbitrary removal efficiently (it would require
+        # a full O(n) scan). Lazy deletion defers the work: we mark the value
+        # as deleted and only discard it when it surfaces to the top via _clean.
         self.deleted[val] += 1
 
     def pop(self):
@@ -341,6 +361,9 @@ def k_way_process(sources: list, process_func):
     for i, source in enumerate(sources):
         iterator = iter(source)
         first = next(iterator, None)
+        # Why `if first is not None`?
+        # `next(iterator, None)` returns None when the source is empty.
+        # Pushing None into the heap would corrupt tuple comparisons.
         # Skip exhausted/empty sources -- they contribute nothing.
         if first is not None:
             heapq.heappush(heap, (first, i, iterator))
@@ -358,6 +381,9 @@ def k_way_process(sources: list, process_func):
         # `next(iterator, None)` returns None when exhausted --
         # we only re-push if the source has more data.
         next_val = next(iterator, None)
+        # Why `if next_val is not None`?
+        # When a source runs out, we simply don't re-add its slot to the heap.
+        # The heap naturally shrinks until all sources are exhausted.
         if next_val is not None:
             heapq.heappush(heap, (next_val, source_idx, iterator))
 ```
@@ -499,11 +525,15 @@ def topKFrequent(nums: list[int], k: int) -> list[int]:
     count = Counter(nums)
 
     # Min-heap by frequency, size k.
-    # The heap tuple is (freq, num): freq is compared first,
-    # so the LEAST frequent element sits at the root as gatekeeper.
+    # Why `(freq, num)` and not `(num, freq)`?
+    # Python compares tuples left-to-right, so the FIRST element determines
+    # heap order. Putting freq first means the least-frequent element floats
+    # to the top -- making it the correct gatekeeper to evict.
+    # If we put num first, ordering would be alphabetical, not by frequency.
     heap = []
     for num, freq in count.items():
         heapq.heappush(heap, (freq, num))
+        # Why `len(heap) > k`?
         # Evict the least frequent whenever heap exceeds k.
         # This guarantees only the k most frequent survive.
         if len(heap) > k:
@@ -559,14 +589,18 @@ def kClosest(points: list[list[int]], k: int) -> list[list[int]]:
 
     for x, y in points:
         dist = x*x + y*y  # No need for sqrt (preserves ordering)
+        # Why `if len(heap) < k`?
+        # Fill the heap to exactly k before switching to replace mode.
+        # Until we have k candidates we never evict -- we simply collect.
         if len(heap) < k:
-            # Negate distance: Python's min-heap becomes a max-heap.
+            # Why `-dist`? Negate distance: Python's min-heap becomes a max-heap.
             # The FARTHEST of the k closest sits at the root as gatekeeper.
             heapq.heappush(heap, (-dist, [x, y]))
+        # Why `dist < -heap[0][0]`?
+        # -heap[0][0] is the farthest distance in our k-closest set.
+        # If this point is closer, it replaces the farthest. If it's farther,
+        # it can never be in the k-closest, so we skip it.
         elif dist < -heap[0][0]:
-            # Why `dist < -heap[0][0]`?
-            # -heap[0][0] is the farthest distance in our k-closest set.
-            # If this point is closer, it replaces the farthest.
             heapq.heapreplace(heap, (-dist, [x, y]))
 
     return [point for dist, point in heap]
@@ -596,7 +630,9 @@ def frequencySort(s: str) -> str:
     heapq.heapify(heap)  # O(n) -- faster than n individual pushes
 
     result = []
-    # Pop characters in frequency order (highest first).
+    # Why `while heap`?
+    # We process every unique character exactly once; when heap is empty
+    # all characters have been appended in frequency-descending order.
     while heap:
         freq, char = heapq.heappop(heap)
         # -freq converts back to the positive count for repetition.
@@ -630,7 +666,10 @@ class ListNode:
 def mergeKLists(lists: list[ListNode]) -> ListNode:
     heap = []
 
-    # Initialize with heads. Skip None lists (empty linked lists).
+    # Initialize with heads.
+    # Why `if node`?
+    # A None head means an empty linked list. Pushing None into the heap
+    # would crash on comparison. Skipping it is safe -- empty lists contribute nothing.
     # We include index `i` as a tiebreaker: when two nodes have the
     # same val, Python compares the next tuple element. Without `i`,
     # it would try to compare ListNode objects, which crashes.
@@ -641,12 +680,17 @@ def mergeKLists(lists: list[ListNode]) -> ListNode:
     dummy = ListNode(0)
     current = dummy
 
+    # Why `while heap`?
+    # The heap holds exactly one pointer per non-exhausted list. Once every
+    # list is fully consumed, the heap empties and the merge is complete.
     while heap:
         val, idx, node = heapq.heappop(heap)
         current.next = node
         current = current.next
 
+        # Why `if node.next`?
         # Only push the next node if this list isn't exhausted.
+        # Pushing None would corrupt the heap with a non-comparable entry.
         if node.next:
             heapq.heappush(heap, (node.next.val, idx, node.next))
 
@@ -678,6 +722,9 @@ def kthSmallest(matrix: list[list[int]], k: int) -> int:
     # Pop k-1 times, push next element from same row
     for _ in range(k - 1):
         val, row, col = heapq.heappop(heap)
+        # Why `col + 1 < n`?
+        # Bounds check -- each row has n columns. Without this guard,
+        # col+1 could index out of range when we reach the last column.
         if col + 1 < n:
             heapq.heappush(heap, (matrix[row][col + 1], row, col + 1))
 
@@ -731,11 +778,18 @@ def kSmallestPairs(nums1: list[int], nums2: list[int], k: int) -> list[list[int]
     for i in range(min(len(nums1), k)):
         heapq.heappush(heap, (nums1[i] + nums2[0], i, 0))
 
+    # Why `while heap and len(result) < k`?
+    # Two exit conditions: we've collected k pairs (done), or we've exhausted
+    # all candidates (heap empty). Checking both prevents over-collection and
+    # avoids popping from an empty heap.
     while heap and len(result) < k:
         sum_val, i, j = heapq.heappop(heap)
         result.append([nums1[i], nums2[j]])
 
-        # Push next pair from same nums1[i]
+        # Why `j + 1 < len(nums2)`?
+        # Each pop for (i, j) spawns its successor (i, j+1) only when j+1
+        # is within bounds. This incrementally explores the sorted space
+        # without materializing all O(m*n) pairs upfront.
         if j + 1 < len(nums2):
             heapq.heappush(heap, (nums1[i] + nums2[j + 1], i, j + 1))
 
@@ -762,6 +816,10 @@ def smallestRange(nums: list[list[int]]) -> list[int]:
 
     result = [float('-inf'), float('inf')]
 
+    # Why `while len(heap) == len(nums)`?
+    # The heap holds exactly one element per list. Once any list is exhausted,
+    # its representative is gone and the heap shrinks below len(nums).
+    # At that point no range can cover all lists, so we stop immediately.
     while len(heap) == len(nums):
         min_val, list_idx, elem_idx = heapq.heappop(heap)
 
@@ -798,16 +856,25 @@ class MedianFinder:
 
     def addNum(self, num: int) -> None:
         # Add to small (max-heap)
+        # Why push to small first, then immediately move its max to large?
+        # This two-step guarantees that every element in small is truly <=
+        # every element in large, even if the new number is very large.
         heapq.heappush(self.small, -num)
 
         # Balance: move max of small to large
         heapq.heappush(self.large, -heapq.heappop(self.small))
 
-        # Ensure small has same or one more element
+        # Why `len(self.large) > len(self.small)` (not `>=`)?
+        # Our invariant allows small to be 1 larger than large (holds median
+        # for odd count). large must NEVER exceed small in size. If it does,
+        # the median calculation breaks (we'd average the wrong elements).
         if len(self.large) > len(self.small):
             heapq.heappush(self.small, -heapq.heappop(self.large))
 
     def findMedian(self) -> float:
+        # Why `len(self.small) > len(self.large)`?
+        # When total count is odd, small holds one extra element -- the true median.
+        # When even, both halves are equal and we average their tops.
         if len(self.small) > len(self.large):
             return -self.small[0]
         return (-self.small[0] + self.large[0]) / 2.0
@@ -835,6 +902,11 @@ def medianSlidingWindow(nums: list[int], k: int) -> list[float]:
     removed = defaultdict(int)  # Lazy removal counts
 
     def add(num):
+        # Why `if not small or num <= -small[0]`?
+        # -small[0] is the current maximum of the lower half.
+        # Numbers at or below that max belong in small (lower half).
+        # Numbers above it belong in large (upper half).
+        # The `not small` guard handles the empty initial state.
         if not small or num <= -small[0]:
             heapq.heappush(small, -num)
         else:
@@ -844,18 +916,29 @@ def medianSlidingWindow(nums: list[int], k: int) -> list[float]:
         removed[num] += 1
 
     def balance():
-        # Balance sizes
+        # Why `while len(small) > len(large) + 1`?
+        # We allow small to hold at most one extra element (for odd windows).
+        # If it has two or more extra, the median would be inside small but
+        # we'd compute it incorrectly. Move extras to large.
         while len(small) > len(large) + 1:
             heapq.heappush(large, -heapq.heappop(small))
             prune(small, -1)
+        # Why `while len(large) > len(small)`?
+        # large must never exceed small. If it does, the lower half is
+        # under-populated and small[0] no longer represents the median.
         while len(large) > len(small):
             heapq.heappush(small, -heapq.heappop(large))
             prune(large, 1)
 
     def prune(heap, sign):
-        # Remove deleted elements from top
+        # Why `while heap` and not `if heap`?
+        # Multiple logically-deleted elements may sit consecutively at the top.
+        # We must drain all of them before the real minimum/maximum is exposed.
         while heap:
             val = -heap[0] if sign == -1 else heap[0]
+            # Why `removed[val] > 0`?
+            # removed tracks how many pending deletions exist for each value.
+            # Decrement and discard until we hit a live element (count == 0).
             if removed[val] > 0:
                 removed[val] -= 1
                 heapq.heappop(heap)
@@ -906,11 +989,19 @@ def findMaximizedCapital(k: int, w: int, profits: list[int], capital: list[int])
     affordable = []
 
     for _ in range(k):
-        # Move all affordable projects to affordable heap
+        # Why `while available and available[0][0] <= w`?
+        # available is a min-heap by capital required. Popping while the
+        # cheapest project is within our budget moves ALL newly unlocked
+        # projects into the affordable max-heap. Stopping early would miss
+        # projects that become reachable only after the previous iteration.
         while available and available[0][0] <= w:
             cap, prof = heapq.heappop(available)
             heapq.heappush(affordable, -prof)
 
+        # Why `if not affordable: break`?
+        # If no project is within budget after collecting all affordable ones,
+        # no future iteration can help either (capital only grows). Early exit
+        # avoids k redundant loops that would pop from an empty heap.
         if not affordable:
             break
 
@@ -942,14 +1033,27 @@ def leastInterval(tasks: list[str], n: int) -> int:
     heapq.heapify(heap)
 
     time = 0
+    # Why `while heap`?
+    # heap shrinks as tasks complete. When it's empty all tasks are scheduled.
     while heap:
         cycle = []
         for _ in range(n + 1):  # Each cycle is n+1 slots
+            # Why `if heap`?
+            # The cooldown window is always n+1 slots wide, but we may run
+            # out of unique tasks before filling the window. Empty slots are
+            # idle time; we still increment `time` to account for the gap.
             if heap:
                 freq = heapq.heappop(heap)
+                # Why `freq < -1`?
+                # freq is stored negated. -1 means 1 remaining occurrence.
+                # After using it, the count drops to 0 -- nothing to re-queue.
+                # Only re-queue tasks that still have occurrences left (freq < -1).
                 if freq < -1:  # More occurrences remaining
                     cycle.append(freq + 1)
             time += 1
+            # Why `if not heap and not cycle: break`?
+            # If no tasks remain in the heap AND no tasks are cooling down,
+            # we've finished everything. Don't pad with unnecessary idle slots.
             if not heap and not cycle:
                 break
 
@@ -994,7 +1098,11 @@ def minMeetingRooms(intervals: list[list[int]]) -> int:
     heapq.heappush(rooms, intervals[0][1])
 
     for start, end in intervals[1:]:
-        # If earliest ending room is free, reuse it
+        # Why `if start >= rooms[0]`?
+        # rooms[0] is the earliest finishing meeting. If the new meeting
+        # starts at or after that finish time, the room is free to reuse.
+        # We pop the old end time and push the new one (same room, new booking).
+        # Without this check, every meeting would get its own room -- always wrong.
         if start >= rooms[0]:
             heapq.heappop(rooms)
 
@@ -1019,6 +1127,10 @@ def reorganizeString(s: str) -> str:
 
     # Check if possible
     max_freq = max(count.values())
+    # Why `max_freq > (len(s) + 1) // 2`?
+    # If one character appears more than ceil(len/2) times it's impossible
+    # to place it without two adjacent copies. Example: "aaab" -- 'a' appears
+    # 3 times in a 4-char string; (4+1)//2 = 2, and 3 > 2, so return "".
     if max_freq > (len(s) + 1) // 2:
         return ""
 
@@ -1033,7 +1145,11 @@ def reorganizeString(s: str) -> str:
         freq, char = heapq.heappop(heap)
         result.append(char)
 
-        # Push back previous character if it has remaining count
+        # Why `if prev_freq < 0`?
+        # prev_freq is stored negated. 0 means the previous character's count
+        # has reached 0 -- nothing left to re-enqueue. A value < 0 means it
+        # still has occurrences and must be made available again after a one-
+        # slot cooldown (which is satisfied because we just placed a different char).
         if prev_freq < 0:
             heapq.heappush(heap, (prev_freq, prev_char))
 
@@ -1062,6 +1178,10 @@ def nthUglyNumber(n: int) -> int:
 
         for factor in [2, 3, 5]:
             new_ugly = ugly * factor
+            # Why `if new_ugly not in seen`?
+            # The same ugly number can be generated multiple ways: e.g., 6 = 2*3 = 3*2.
+            # Without the seen-set check, 6 would be pushed twice, causing duplicates
+            # and returning a wrong nth ugly number.
             if new_ugly not in seen:
                 seen.add(new_ugly)
                 heapq.heappush(heap, new_ugly)
@@ -1132,8 +1252,15 @@ def trapRainWater(heightMap: list[list[int]]) -> int:
 
         for di, dj in directions:
             ni, nj = i + di, j + dj
+            # Why `not visited[ni][nj]`?
+            # A cell can be reached from multiple boundary directions. Without the
+            # visited check, we'd process it multiple times, counting its water
+            # contribution repeatedly and inflating the result.
             if 0 <= ni < m and 0 <= nj < n and not visited[ni][nj]:
                 visited[ni][nj] = True
+                # Why `max(0, height - heightMap[ni][nj])`?
+                # `height` is the water level dictated by the surrounding boundary.
+                # If the neighbor is taller, no water can pool there (max clamps to 0).
                 water += max(0, height - heightMap[ni][nj])
                 heapq.heappush(heap, (max(height, heightMap[ni][nj]), ni, nj))
 
@@ -1153,6 +1280,10 @@ def connectSticks(sticks: list[int]) -> int:
     heapq.heapify(sticks)
     cost = 0
 
+    # Why `while len(sticks) > 1`?
+    # We need at least two sticks to perform a merge. When only one remains,
+    # all merges are done. Using `> 1` (not `> 0`) prevents popping from a
+    # single-element heap which would leave `second` undefined.
     while len(sticks) > 1:
         first = heapq.heappop(sticks)
         second = heapq.heappop(sticks)
@@ -1186,6 +1317,10 @@ def maxPerformance(n: int, speed: list[int], efficiency: list[int], k: int) -> i
         heapq.heappush(heap, spd)
         speed_sum += spd
 
+        # Why `if len(heap) > k`?
+        # We can pick at most k engineers. When the heap exceeds k, evict
+        # the slowest (min-heap root) to keep only the k fastest included so far.
+        # This maximises speed_sum for any given efficiency lower bound.
         if len(heap) > k:
             speed_sum -= heapq.heappop(heap)
 
@@ -1547,3 +1682,51 @@ large = []  # min-heap
 5. Attempt LC 480 (combines patterns)
 
 Good luck with your interview preparation!
+
+---
+
+## Appendix: Conditional Quick Reference
+
+This table lists every key condition used in this handbook, its plain-English meaning, and the intuition behind it.
+
+### A. Heap Size & Maintenance Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if len(heap) < k` | Heap is not yet full | Fill to exactly k before entering replace mode; avoids evicting valid candidates too early |
+| `if len(heap) > k` | Heap has one too many elements | After pushing, trim the excess immediately — keeps exactly k elements at all times (off-by-one guard) |
+| `while len(sticks) > 1` | At least two sticks remain to merge | Need two operands for every combine step; `> 1` prevents an undefined second pop on the last element |
+| `while heap and len(result) < k` | Heap non-empty AND haven't collected k results yet | Two exit conditions: collected enough (stop early) or exhausted all candidates (stop safely) |
+| `if len(heap) > k` (maxPerformance) | Team size exceeds k | Evict the slowest engineer to keep the k-fastest for the current efficiency lower bound |
+| `if elem_idx + 1 < len(lists[list_idx])` | Next element exists in this list | Bounds guard — only extend the heap pointer when the current list has more elements |
+| `if col + 1 < n` | Next column exists in this matrix row | Bounds guard — prevents out-of-range access when a row is fully consumed |
+
+### B. Min-Heap / Max-Heap Conversion Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `heapq.heappush(heap, -val)` | Store the negated value | Python only provides min-heap; negating flips the ordering so the largest value becomes the smallest stored key |
+| `max_val = -heapq.heappop(heap)` | Negate the popped value back | Recovers the true positive magnitude after the heap has stored it negated |
+| `elif num > heap[0]` | New number beats the current gatekeeper | heap[0] is the smallest of k largest; only larger numbers deserve entry — smaller ones are irrelevant |
+| `elif num < -heap[0]` (k-smallest) | New number beats the k-smallest gatekeeper | -heap[0] is the largest of k smallest; only smaller numbers deserve entry into the k-smallest set |
+| `(-freq, char)` tuple ordering | Frequency is compared first | Python sorts tuples left-to-right; putting freq (negated) first makes the heap ordered by frequency, not alphabetically |
+
+### C. Balance & Median Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if len(self.large) > len(self.small)` | Upper half is bigger than lower half | Invariant: small can be at most 1 larger, never smaller. Violation means the median pointer is on the wrong side |
+| `if len(self.small) > len(self.large)` | Lower half holds the extra element | Odd total count means the middle element lives in small; return -small[0] directly instead of averaging |
+| `while len(small) > len(large) + 1` | small has more than one extra element | The +1 tolerance allows for odd-count windows; more than +1 means small is over-filled and must donate to large |
+| `while len(large) > len(small)` | Upper half exceeds lower half | large must never be bigger; if it is, the median would be miscalculated (averaging wrong tops) |
+| `if not small or num <= -small[0]` | Number belongs in the lower half | Route incoming numbers: values at or below the current lower-half max stay in small; larger ones go to large |
+| `while len(heap) == len(nums)` | All lists still have a representative | The moment any list is exhausted the covering range condition is broken; stop as soon as heap shrinks |
+
+### D. Lazy Deletion & Staleness Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `while self.heap and self.deleted[self.heap[0]] > 0` | Top element is marked for deletion | Multiple consecutive deleted elements may stack up; loop (not if) drains ALL phantom tops before exposing the live minimum |
+| `if removed[val] > 0` (sliding window prune) | This value has pending removals | Deletion counter tracks how many phantom copies exist; decrement and discard until a live element is found |
+| `if new_ugly not in seen` | This ugly number hasn't been generated yet | The same value can be reached via multiple factor paths (e.g. 6 = 2×3 = 3×2); the seen-set prevents duplicate heap entries |
+| `if node in visited: continue` (Dijkstra pattern) | A shorter path to this node was already processed | Lazy deletion in Dijkstra: stale entries with outdated distances remain in the heap; skip them to avoid reprocessing |

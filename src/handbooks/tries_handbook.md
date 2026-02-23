@@ -473,18 +473,25 @@ class Trie:
             if char not in node.children:
                 return False
             node = node.children[char]
-        # We reached the end of the word path. Return is_end, NOT True,
-        # because the path might exist only as a prefix of a longer word.
+        # Why `return node.is_end` and not `return True`?
+        # The full path might exist only because a longer word was inserted.
+        # Example: if "apple" was inserted, the path for "app" exists, but
+        # "app" was not inserted -- is_end=False guards against false positives.
         return node.is_end
 
     def startsWith(self, prefix: str) -> bool:
         node = self.root
         for char in prefix:
+            # Why `char not in node.children`?
+            # The prefix diverges from all stored words at this character.
+            # No inserted word begins with the characters typed so far.
             if char not in node.children:
                 return False
             node = node.children[char]
-        # Return True (not is_end) because any existing path counts
-        # as a valid prefix, whether or not a complete word ends here.
+        # Why `return True` (not `return node.is_end`)?
+        # startsWith only asks "does any stored word begin with this prefix?"
+        # The prefix does NOT need to be a complete word itself -- even a
+        # pure prefix like "app" (from "apple") should return True.
         return True
 ```
 
@@ -517,16 +524,29 @@ class WordDictionary:
                 return '$' in node
 
             char = word[i]
+            # Why `char == '.'`?
+            # '.' is a wildcard that must match exactly one character.
+            # We cannot follow a single path -- we must branch into every
+            # real child because any letter could satisfy the wildcard.
             if char == '.':
                 # '.' matches any character, so we must try EVERY child.
                 # We skip '$' because it is not a real character -- it is
                 # the end-of-word marker and cannot match '.'.
                 for key in node:
+                    # Why `key != '$'`?
+                    # '$' is an internal sentinel for end-of-word, not an
+                    # actual character in any string. Recursing into it
+                    # would treat the sentinel as a real letter, causing
+                    # incorrect matches.
                     if key != '$' and dfs(node[key], i + 1):
                         return True
                 return False
             else:
                 # Exact character match: the path must exist.
+                # Why `char not in node`?
+                # If this exact character has no child, no stored word
+                # follows this path -- return False immediately rather
+                # than crashing on a missing key.
                 if char not in node:
                     return False
                 return dfs(node[char], i + 1)
@@ -594,8 +614,12 @@ def findWords(board: list[list[str]], words: list[str]) -> list[str]:
         # Explore all 4 neighbors
         for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
             nr, nc = r + dr, c + dc
-            # Bounds check AND visited check (board[nr][nc] != '#')
-            # combined in one condition for efficiency.
+            # Why `0 <= nr < rows and 0 <= nc < cols`?
+            # Grid boundaries: stepping outside means we fell off the board.
+            # Why `board[nr][nc] != '#'`?
+            # '#' marks cells already on the current DFS path. Revisiting
+            # one would create a cycle, using the same grid cell twice in
+            # one word -- which is not allowed.
             if 0 <= nr < rows and 0 <= nc < cols and board[nr][nc] != '#':
                 dfs(nr, nc, next_node)
 
@@ -603,9 +627,11 @@ def findWords(board: list[list[str]], words: list[str]) -> list[str]:
         # starting cells can use this cell in their paths.
         board[r][c] = char
 
-        # Optimization: if next_node has no remaining children, it
-        # cannot lead to any more undiscovered words. Remove it from
-        # the trie so future DFS calls skip this branch entirely.
+        # Why `not next_node.children`?
+        # If the node has no children left, it is a dead leaf -- no more
+        # words can be discovered through it. Deleting it prunes the trie
+        # so future DFS calls skip this branch immediately, a key
+        # optimization for large boards with many starting cells.
         if not next_node.children:
             del node.children[char]
 
@@ -652,12 +678,14 @@ def longestCommonPrefix(strs: list[str]) -> str:
     prefix = []
     node = root
     while True:
-        # Stop if:
-        # - '$' in node: a word ends here, so a shorter word exists
-        #   and the common prefix cannot extend further.
-        # - len(node) != 1: the path branches into multiple characters,
-        #   meaning the strings diverge at this position.
-        # Both conditions mean the common prefix has ended.
+        # Why `'$' in node`?
+        # If an end-of-word sentinel exists here, one of the input strings
+        # terminates at this depth. Extending the prefix further would
+        # exclude that shorter string, so we must stop.
+        # Why `len(node) != 1`?
+        # More than one child means the strings diverge here (e.g., "flower"
+        # goes to 'l' while "flow" ends at '$'). A single child means all
+        # strings still agree on the next character.
         if '$' in node or len(node) != 1:
             break
         char = next(iter(node.keys()))
@@ -679,9 +707,16 @@ def longestCommonPrefix_simple(strs: list[str]) -> str:
         # Why `while` and not `if`? Because we may need to chop off
         # more than one character -- e.g., prefix="flower" and
         # s="flight" requires shrinking to "fl".
+        # Why `while not s.startswith(prefix)` (not `if`)?
+        # A single chop may not be enough -- "flower" vs "flight" requires
+        # removing 'e', 'r', 'w', 'o' one at a time until "fl" remains.
+        # `if` would only remove one character per string, giving wrong results.
         while not s.startswith(prefix):
             prefix = prefix[:-1]
-            # If the prefix is empty, no common prefix exists at all.
+            # Why `if not prefix`?
+            # Once the prefix shrinks to empty, no common prefix exists.
+            # Returning immediately avoids an infinite loop (an empty string
+            # is always a prefix, so `while` would never terminate).
             if not prefix:
                 return ""
 
@@ -711,9 +746,11 @@ def suggestedProducts(products: list[str], searchWord: str) -> list[list[str]]:
             if char not in node.children:
                 node.children[char] = TrieNode()
             node = node.children[char]
-            # Why `< 3`? The problem asks for at most 3 suggestions.
-            # Because products are pre-sorted, the first 3 that pass
-            # through this node are already the lexicographically smallest.
+            # Why `len(node.suggestions) < 3`?
+            # The problem asks for at most 3 suggestions per prefix.
+            # Because products are pre-sorted lexicographically, the first
+            # 3 that pass through this node are already the lexicographically
+            # smallest -- so we cap at 3 and ignore later products.
             if len(node.suggestions) < 3:
                 node.suggestions.append(product)
 
@@ -721,10 +758,12 @@ def suggestedProducts(products: list[str], searchWord: str) -> list[list[str]]:
     result = []
     node = root
     for char in searchWord:
-        # Why check `node` first? Once we fall off the trie (node
-        # becomes None), no further characters can have suggestions.
-        # Why check `char in node.children`? The typed prefix may not
-        # match any product beyond this point.
+        # Why `node` (truthiness check first)?
+        # Once a previous character fell off the trie, `node` was set to
+        # None. Checking it first avoids a crash on `char in node.children`.
+        # Why `char in node.children`?
+        # The typed character may not match any stored product at this depth,
+        # meaning no product shares this prefix -- no suggestions possible.
         if node and char in node.children:
             node = node.children[char]
             result.append(node.suggestions)
@@ -758,8 +797,10 @@ def replaceWords(dictionary: list[str], sentence: str) -> str:
     def find_root(word):
         node = root
         for char in word:
-            # If the character is missing from the trie, no dictionary
-            # root is a prefix of this word -- return the word unchanged.
+            # Why `char not in node`?
+            # If the trie has no path for this character, no dictionary
+            # root starts with this prefix -- the word has no replacement,
+            # so return it unchanged.
             if char not in node:
                 return word
             node = node[char]
@@ -812,12 +853,17 @@ class AutocompleteSystem:
         sentences = []
 
         def dfs(n):
-            # If this node has a '$' key, a complete sentence ends here.
+            # Why `'$' in n`?
+            # '$' signals that a complete sentence ends at this trie node.
+            # Without this check we would only collect sentences at leaf
+            # nodes, missing any sentence that is a prefix of another.
             if '$' in n:
                 sentences.append(n['$'])
             for char in n:
-                # Skip '$' -- it is the end-of-word sentinel, not a
-                # child to recurse into.
+                # Why `char != '$'`?
+                # '$' is the end-of-word sentinel, not a real character.
+                # Recursing into it would crash because n['$'] is True
+                # (a bool, not a dict), so we must skip it.
                 if char != '$':
                     dfs(n[char])
 
@@ -837,14 +883,18 @@ class AutocompleteSystem:
 
         self.current_input.append(c)
 
-        # If current_node is None, a previous character already fell
-        # off the trie. No prefix match is possible anymore.
+        # Why `self.current_node is None`?
+        # Once any character in the current input fell off the trie,
+        # the running prefix cannot match any sentence. We use None as
+        # a sentinel to avoid re-checking the trie on every subsequent
+        # character -- early exit for all remaining characters.
         if self.current_node is None:
             return []
 
-        # If the new character has no child in the trie, the current
-        # prefix does not match any stored sentence. Set node to None
-        # so all future characters in this sentence also return [].
+        # Why `c not in self.current_node`?
+        # The newly typed character has no branch in the trie at this
+        # depth, so no stored sentence shares the current prefix.
+        # Set to None so future characters also short-circuit immediately.
         if c not in self.current_node:
             self.current_node = None
             return []
@@ -895,12 +945,20 @@ def findMaximumXOR(nums: list[int]) -> int:
         current_xor = 0
         for i in range(max_bits - 1, -1, -1):
             bit = (num >> i) & 1
-            # Want opposite bit for max XOR
+            # Want opposite bit for max XOR.
+            # XOR of two equal bits is 0; XOR of opposite bits is 1.
+            # Choosing the opposite at every position greedily maximizes
+            # the result because higher bits contribute more value.
             want = 1 - bit
+            # Why `want in node`?
+            # If the preferred (opposite) bit exists in the trie, take it:
+            # this bit position becomes 1 in the XOR result.
             if want in node:
                 current_xor |= (1 << i)
                 node = node[want]
             else:
+                # The opposite bit does not exist; we must follow the same
+                # bit. XOR at this position is 0 -- no contribution to result.
                 node = node[bit]
         max_xor = max(max_xor, current_xor)
 
@@ -934,6 +992,9 @@ def maximizeXor(nums: list[int], queries: list[list[int]]) -> list[int]:
             node = node[bit]
 
     def query(num):
+        # Why `not root`?
+        # If no numbers have been inserted yet (trie is empty), there is
+        # no valid pair to XOR with. Return -1 per problem specification.
         if not root:
             return -1
         node = root
@@ -941,17 +1002,33 @@ def maximizeXor(nums: list[int], queries: list[list[int]]) -> list[int]:
         for i in range(max_bits - 1, -1, -1):
             bit = (num >> i) & 1
             want = 1 - bit
+            # Why `want in node`?
+            # Prefer the opposite bit to maximize XOR. If it exists in
+            # the trie (some number has this bit value), take the greedy
+            # choice and record a 1 at this bit position.
             if want in node:
                 xor_val |= (1 << i)
                 node = node[want]
+            # Why `elif bit in node`?
+            # Opposite bit unavailable; settle for the same bit (XOR = 0
+            # here). We still need to continue traversing to lower bits.
             elif bit in node:
                 node = node[bit]
             else:
+                # Neither bit exists -- no valid number in trie matches.
+                # This should not happen if the trie is correctly built,
+                # but we guard against it to avoid a KeyError crash.
                 return -1
         return xor_val
 
     for idx, (x, m) in indexed_queries:
-        # Add all numbers <= m
+        # Why `nums[j] <= m`?
+        # Each query has a bound m: only numbers <= m may be used in the XOR.
+        # Because both nums and queries are sorted by bound, a two-pointer
+        # approach works: insert nums one by one until we exceed the current
+        # query's limit, then answer the query with only valid numbers in the trie.
+        # Why `j < len(nums)`?
+        # Guard against reading past the end of the nums array.
         while j < len(nums) and nums[j] <= m:
             insert(nums[j])
             j += 1
@@ -981,12 +1058,22 @@ def countPairs(nums: list[int], low: int, high: int) -> int:
             # Query: how many previous numbers XOR with num < limit
             node = root
             for i in range(14, -1, -1):
+                # Why `node is None`?
+                # The trie ran out of branches -- no more numbers satisfy
+                # the XOR constraint at this depth. Stop early.
                 if node is None:
                     break
 
                 bit = (num >> i) & 1
                 limit_bit = (limit >> i) & 1
 
+                # Why `limit_bit == 1`?
+                # When the limit has a 1 at this bit position, any XOR
+                # result with a 0 here is automatically less than the
+                # limit (the higher bit is 0 < 1). We can count ALL
+                # numbers in the "same bit" subtree immediately and then
+                # continue exploring the "opposite bit" branch to see if
+                # XOR can equal 1 here but still be under limit in lower bits.
                 if limit_bit == 1:
                     # If we go same as bit, XOR is 0 for this position
                     # All numbers in that subtree contribute
@@ -995,6 +1082,10 @@ def countPairs(nums: list[int], low: int, high: int) -> int:
                     # Continue with opposite (XOR = 1)
                     node = node.get(1 - bit)
                 else:
+                    # Why follow the same bit when limit_bit == 0?
+                    # We need XOR to be 0 at this position (since limit
+                    # is 0 here). Going opposite would make XOR = 1 at
+                    # this position, which already exceeds the limit bit.
                     # Must go same to keep XOR < limit
                     node = node.get(bit)
 
@@ -1040,13 +1131,23 @@ class StreamChecker:
     def query(self, letter: str) -> bool:
         self.stream.append(letter)
 
-        # Check if any word is suffix of current stream
+        # Check if any word is suffix of current stream.
+        # We walk backwards through the stream because the trie stores
+        # reversed words -- the last character is the trie's first level.
         node = self.root
         for i in range(len(self.stream) - 1, -1, -1):
             char = self.stream[i]
+            # Why `char not in node`?
+            # The current suffix character has no matching branch in the
+            # reversed-word trie, so no dictionary word ends with this
+            # suffix. Return False immediately (no point going further back).
             if char not in node:
                 return False
             node = node[char]
+            # Why `'$' in node` inside the loop (not just at the end)?
+            # Words can have different lengths. Checking at each step lets
+            # us detect a match as soon as the shortest matching suffix is
+            # confirmed, rather than requiring a full loop iteration.
             if '$' in node:
                 return True
 
@@ -1302,3 +1403,51 @@ Where L = word length, N = number of words, R = results
 4. XOR: 421 → 1707
 
 Good luck with your interview preparation!
+
+---
+
+## Appendix: Conditional Quick Reference
+
+This table lists every key condition used in this handbook, its plain-English meaning, and the intuition behind it.
+
+### A. Insert / Search Core
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `char not in node.children` | This character has no child node yet | Prevents a KeyError crash; on insert we create the node, on search/startsWith we return False/None immediately |
+| `not node.children[index]` | The array slot for this character is still None | Array-based trie equivalent of the dict check above -- None means no child was ever created for this character |
+| `node.is_end` | A complete word was explicitly inserted ending at this node | Distinguishes an inserted word from a word that is merely a prefix of a longer stored word (e.g., "app" vs "apple") |
+| `node is not None and node.is_end` | The full path exists AND marks a complete word | Both halves required: path alone could be a prefix; is_end alone is unreachable if path is missing |
+| `return node.is_end` (in search) | Return whether a real word ends here, not just True | Returning True would falsely match prefixes; is_end is False for nodes that only exist as interior stops |
+| `return True` (in startsWith) | Any existing path is a valid prefix | startsWith does not require a complete word -- the path existing is sufficient proof |
+| `node is not None` (in startsWith) | The entire prefix path was found without breaking | If any character was missing, _find_node returned None, meaning the prefix does not exist |
+
+### B. Prefix / Wildcard Matching
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `char == '.'` | Current pattern character is a wildcard | '.' must match every possible letter, so we branch into all children instead of following one path |
+| `key != '$'` (when iterating wildcard children) | Skip the end-of-word sentinel when expanding '.' | '$' is an internal marker (bool True), not a real character; recursing into it would crash or give wrong results |
+| `'$' in node` (search end-of-word check) | A complete word/sentence ends at this node | Sentinel-based end marker -- checking at every step catches any-length matches, not just the deepest node |
+| `'$' in node or len(node) != 1` (LCP loop) | A word ends here OR the trie branches here | Either condition means the common prefix cannot grow: a branch means strings diverge, a word-end means a shorter string would be excluded |
+| `node and char in node.children` (suggestions search) | Node still valid AND this character has a branch | Guards against both a None node (previously fell off trie) and a missing character at the current depth |
+
+### C. Word Break / DP on Trie
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `char not in node` (find_root loop) | Trie has no continuation for this character | The sentence word has no dictionary root as a prefix -- return the word unchanged rather than crashing |
+| `if '$' in node` (find_root, inside loop) | The shortest dictionary root ends here | Checking at every step (not just the end) ensures we return the SHORTEST matching root, not a longer one deeper in the trie |
+| `while not s.startswith(prefix)` | Current prefix does not match this string's start | Uses while (not if) because multiple characters may need removing -- "flower" vs "flight" shrinks from 6 to 2 characters |
+| `if not prefix` (inside LCP while loop) | The prefix shrunk to empty -- no common prefix exists | Prevents an infinite loop (empty string always satisfies startswith) and returns the correct early-exit answer |
+| `nums[j] <= m` (XOR with bound, while loop) | This number is within the query's allowed limit | Offline sorted queries: only insert numbers that satisfy the bound before answering each query, ensuring correctness |
+
+### D. Delete / Cleanup Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if char not in node.children` (erase early exit) | Word path does not exist -- nothing to erase | Gracefully handles erasing a word that was never inserted; prevents decrementing counts below zero |
+| `if not next_node.children` (Word Search II prune) | Trie node is now a dead leaf with no remaining words | Once all words through this node are found, the branch is useless; deleting it prunes future DFS calls and speeds up the algorithm |
+| `if self.current_node is None` (autocomplete guard) | A previous character already fell off the trie | Sentinel-based short-circuit: once we leave the trie, no subsequent character can match -- avoids re-checking the trie on every keystroke |
+| `if not root` (XOR query guard) | Trie is completely empty -- no numbers inserted yet | Returning -1 immediately matches the problem spec and avoids a crash when traversing an empty dict |
+| `if node is None: break` (countPairs loop) | Trie branch exhausted during XOR counting traversal | No valid paths remain at this bit depth; breaking prevents a NoneType attribute error and correctly terminates the count |

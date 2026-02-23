@@ -443,9 +443,12 @@ def preorderTraversal(root: TreeNode) -> list[int]:
     result = []
 
     def dfs(node):
+        # Why `if not node: return`?
+        # Recursion always goes past the leaves -- a leaf's children are None.
+        # Without this guard, `node.val` on None would crash immediately.
         if not node:
             return
-        result.append(node.val)  # Process root
+        result.append(node.val)  # Process root BEFORE children (pre-order)
         dfs(node.left)           # Then left
         dfs(node.right)          # Then right
 
@@ -456,6 +459,9 @@ def preorderTraversal(root: TreeNode) -> list[int]:
 **Iterative:**
 ```python
 def preorderTraversal_iterative(root: TreeNode) -> list[int]:
+    # Why guard `if not root` before building the stack?
+    # Avoids initializing and entering the while loop for an empty tree;
+    # pushing None onto the stack would crash on `node.val` immediately.
     if not root:
         return []
 
@@ -465,7 +471,9 @@ def preorderTraversal_iterative(root: TreeNode) -> list[int]:
     while stack:
         node = stack.pop()
         result.append(node.val)
-        # Push right first (LIFO: left processed first)
+        # Why push right BEFORE left?
+        # The stack is LIFO, so whatever is pushed last is processed first.
+        # Pushing right first ensures left is popped next, preserving preorder.
         if node.right:
             stack.append(node.right)
         if node.left:
@@ -488,11 +496,14 @@ def inorderTraversal(root: TreeNode) -> list[int]:
     result = []
 
     def dfs(node):
+        # Why `if not node: return`?
+        # Every recursive call will eventually receive None (past a leaf).
+        # Without this, accessing node.left or node.val crashes.
         if not node:
             return
-        dfs(node.left)           # First left
-        result.append(node.val)  # Process root
-        dfs(node.right)          # Then right
+        dfs(node.left)           # First go all the way LEFT
+        result.append(node.val)  # THEN process current node (inorder = sorted for BST)
+        dfs(node.right)          # THEN right subtree
 
     dfs(root)
     return result
@@ -505,6 +516,9 @@ def inorderTraversal_iterative(root: TreeNode) -> list[int]:
     stack = []
     current = root
 
+    # Why `current or stack` (two conditions)?
+    # We alternate between two phases: drilling left (current != None) and
+    # backtracking (stack not empty). Both must be exhausted before we stop.
     while current or stack:
         # Go left as far as possible
         while current:
@@ -535,11 +549,14 @@ def postorderTraversal(root: TreeNode) -> list[int]:
     result = []
 
     def dfs(node):
+        # Why `if not node: return`?
+        # Base case for all recursive tree functions -- leaf children are None.
+        # Without this guard we crash when trying to access node.left.
         if not node:
             return
-        dfs(node.left)           # First left
-        dfs(node.right)          # Then right
-        result.append(node.val)  # Process root last
+        dfs(node.left)           # First left subtree
+        dfs(node.right)          # Then right subtree
+        result.append(node.val)  # Process root LAST (postorder = children first)
 
     dfs(root)
     return result
@@ -557,7 +574,9 @@ def postorderTraversal_iterative(root: TreeNode) -> list[int]:
     while stack:
         node = stack.pop()
         result.append(node.val)
-        # Push left first (we'll reverse at end)
+        # Why push left BEFORE right here (opposite of preorder)?
+        # We reverse the result at the end. Reversing a modified preorder
+        # (root-right-left) gives postorder (left-right-root).
         if node.left:
             stack.append(node.left)
         if node.right:
@@ -576,20 +595,34 @@ def postorderTraversal_iterative(root: TreeNode) -> list[int]:
 from collections import deque
 
 def levelOrder(root: TreeNode) -> list[list[int]]:
+    # Why return [] for None root (not crash)?
+    # An empty tree has no levels; this prevents accessing .left/.right on None.
     if not root:
         return []
 
     result = []
     queue = deque([root])
 
+    # Why `while queue`?
+    # The queue is non-empty as long as there are unprocessed nodes.
+    # When all nodes have been dequeued and no children added, it empties.
     while queue:
+        # Why snapshot `len(queue)` before the inner loop?
+        # At this moment, the queue holds exactly the nodes of the current level.
+        # The inner loop will enqueue next-level children into the same queue.
+        # Snapshotting prevents accidentally processing those new children now.
         level_size = len(queue)
         level = []
 
+        # Why `for _ in range(level_size)` and not `while queue`?
+        # We want to process EXACTLY this level's nodes -- no more, no less.
+        # Using `while queue` here would consume next-level nodes too, mixing levels.
         for _ in range(level_size):
             node = queue.popleft()
             level.append(node.val)
 
+            # Why guard with `if node.left`?
+            # Appending None would cause a crash when we call node.val later.
             if node.left:
                 queue.append(node.left)
             if node.right:
@@ -614,12 +647,18 @@ def levelOrder(root: TreeNode) -> list[list[int]]:
 
 ```python
 def maxDepth(root: TreeNode) -> int:
+    # Why return 0 for None (not -1 or crash)?
+    # A None node contributes 0 edges -- it represents the absence of a subtree.
+    # Returning 0 means: "this path has no length", which combines cleanly with +1.
     if not root:
         return 0
 
     left_depth = maxDepth(root.left)
     right_depth = maxDepth(root.right)
 
+    # Why `max(left_depth, right_depth) + 1`?
+    # We take the LONGER of the two child paths -- the farthest leaf defines depth.
+    # The +1 counts the current node itself as one level.
     return 1 + max(left_depth, right_depth)
 ```
 
@@ -632,6 +671,9 @@ def maxDepth_bfs(root: TreeNode) -> int:
     depth = 0
     queue = deque([root])
 
+    # Why increment `depth` once per level (outside the inner loop)?
+    # Each pass through the outer while loop processes exactly one full level.
+    # Incrementing here ties depth to "number of levels fully processed".
     while queue:
         depth += 1
         for _ in range(len(queue)):
@@ -656,6 +698,9 @@ def maxDepth_bfs(root: TreeNode) -> int:
 def isBalanced(root: TreeNode) -> bool:
     def check_height(node):
         """Returns height if balanced, -1 if unbalanced."""
+        # Why return 0 for None?
+        # An absent node has height 0 -- it contributes nothing to depth.
+        # This is the same base case used in maxDepth.
         if not node:
             return 0
 
@@ -677,6 +722,9 @@ def isBalanced(root: TreeNode) -> bool:
         if abs(left_height - right_height) > 1:
             return -1
 
+        # Why `max` (not `min`) for height here?
+        # Height = longest path to a leaf. We must account for the deeper side
+        # because that's what the parent will compare against its other child.
         return 1 + max(left_height, right_height)
 
     return check_height(root) != -1
@@ -700,16 +748,24 @@ def diameterOfBinaryTree(root: TreeNode) -> int:
 
     def height(node):
         nonlocal diameter
+        # Why return 0 for None?
+        # A missing subtree has zero depth; adding 0 to the other side's depth
+        # correctly gives the one-sided path length for a node with one child.
         if not node:
             return 0
 
         left_h = height(node.left)
         right_h = height(node.right)
 
-        # Update diameter (path through this node)
+        # Why `left_h + right_h` (ADD, not max) for diameter?
+        # The longest path THROUGH this node uses BOTH arms: it goes down the left
+        # subtree AND down the right subtree. Max would only use one arm.
+        # Example: node with left_h=2, right_h=3 → diameter candidate = 5 edges.
         diameter = max(diameter, left_h + right_h)
 
-        # Return height for parent's calculation
+        # Why return `max(left_h, right_h) + 1` (not sum) to the parent?
+        # The parent needs to know the longest single path extending DOWNWARD.
+        # A path can't go down both arms and still be a valid simple path upward.
         return 1 + max(left_h, right_h)
 
     height(root)
@@ -741,6 +797,8 @@ At node 1: left_h=2 (through 2), right_h=1 (node 3)
 
 ```python
 def minDepth(root: TreeNode) -> int:
+    # Why return 0 for None (same as maxDepth)?
+    # None means no subtree at all; depth is 0. The caller adds +1 for itself.
     if not root:
         return 0
 
@@ -754,6 +812,8 @@ def minDepth(root: TreeNode) -> int:
     if not root.right:
         return 1 + minDepth(root.left)
 
+    # Why `min` here (vs `max` in maxDepth)?
+    # We want the SHORTEST root-to-leaf path, so we take the shallower child.
     return 1 + min(minDepth(root.left), minDepth(root.right))
 ```
 
@@ -806,10 +866,15 @@ def hasPathSum(root: TreeNode, targetSum: int) -> bool:
     # nodes, we might return True for a partial path that doesn't reach
     # a leaf. Example: tree [1,2], target=1 -- node 1 matches, but
     # the path 1->2 doesn't sum to 1 at a leaf.
+    # Why check BOTH `not node.left AND not node.right`?
+    # A leaf has NO children at all. If only one is None, the other subtree
+    # still exists and we must continue down it.
     if not root.left and not root.right:
         return root.val == targetSum
 
-    # Recurse with reduced target
+    # Why subtract `root.val` before recursing (not after)?
+    # We're tracking how much target remains BELOW this node.
+    # Subtracting here lets the recursive call compare against 0 at the leaf.
     remaining = targetSum - root.val
     return (hasPathSum(root.left, remaining) or
             hasPathSum(root.right, remaining))
@@ -826,12 +891,17 @@ def pathSum(root: TreeNode, targetSum: int) -> list[list[int]]:
     result = []
 
     def dfs(node, remaining, path):
+        # Why return early for None?
+        # Same as hasPathSum -- None is not a leaf; no valid path ends here.
         if not node:
             return
 
         path.append(node.val)
 
-        # Check leaf
+        # Why check `remaining == node.val` at a leaf (not `remaining == 0`)?
+        # We haven't subtracted node.val yet at this point -- we check if the
+        # current node's value EXACTLY accounts for the remaining budget.
+        # Checking `== 0` would require subtracting first, but we do it inline here.
         if not node.left and not node.right:
             if remaining == node.val:
                 result.append(path.copy())
@@ -861,19 +931,27 @@ def maxPathSum(root: TreeNode) -> int:
 
     def max_gain(node):
         nonlocal max_sum
+        # Why return 0 for None (not -inf)?
+        # A missing subtree contributes nothing. Returning 0 means "don't use
+        # this arm", which is correct because we only extend a path if it adds value.
         if not node:
             return 0
 
-        # Max gain from left/right (ignore negative paths)
+        # Why `max(..., 0)`? We clamp negative gains to 0.
+        # If a subtree has negative total, taking it hurts the path sum.
+        # Choosing 0 means "ignore that arm" -- don't extend through it.
         left_gain = max(max_gain(node.left), 0)
         right_gain = max(max_gain(node.right), 0)
 
-        # Path through current node
+        # Why ADD both gains (left + right) for path_sum?
+        # The best path THROUGH this node can extend in BOTH directions simultaneously.
+        # This is the "diameter" trick applied to weighted paths.
         path_sum = node.val + left_gain + right_gain
         max_sum = max(max_sum, path_sum)
 
-        # Return max gain if we continue path upward
-        # Can only pick ONE child to continue
+        # Why return only `max(left_gain, right_gain)` to the parent (not both)?
+        # A path continuing upward is a single chain -- it can only come FROM one side.
+        # Returning both would create a "Y" shape which isn't a valid simple path.
         return node.val + max(left_gain, right_gain)
 
     max_gain(root)
@@ -893,12 +971,18 @@ def maxPathSum(root: TreeNode) -> int:
 ```python
 def sumNumbers(root: TreeNode) -> int:
     def dfs(node, current_num):
+        # Why return 0 for None?
+        # A None branch contributes no number to the sum.
+        # Returning 0 is the additive identity -- it leaves the total unchanged.
         if not node:
             return 0
 
         current_num = current_num * 10 + node.val
 
-        # Leaf node
+        # Why return `current_num` at a leaf instead of continuing to recurse?
+        # At a leaf we've formed a complete number. Recursing further would
+        # call dfs(None, ...) and return 0, which is correct but wasteful.
+        # Returning here is the natural exit: the number is fully built.
         if not node.left and not node.right:
             return current_num
 
@@ -931,7 +1015,10 @@ def rightSideView(root: TreeNode) -> list[int]:
         for i in range(level_size):
             node = queue.popleft()
 
-            # Last node of this level is visible from right
+            # Why check `i == level_size - 1`?
+            # BFS processes nodes left-to-right within a level. The LAST node
+            # processed at each level is the rightmost one -- the one visible
+            # from the right side. We only record that final node.
             if i == level_size - 1:
                 result.append(node.val)
 
@@ -949,10 +1036,15 @@ def rightSideView_dfs(root: TreeNode) -> list[int]:
     result = []
 
     def dfs(node, depth):
+        # Why return for None?
+        # Prevents accessing node.val and ensures we don't record phantom nodes.
         if not node:
             return
 
-        # First node we see at this depth (going right first)
+        # Why check `depth == len(result)`?
+        # We traverse right-first, so the first node seen at each depth IS the
+        # rightmost one. `len(result)` equals the number of depths already recorded,
+        # so equality means we're seeing a new depth for the first time.
         if depth == len(result):
             result.append(node.val)
 
@@ -1048,12 +1140,24 @@ def averageOfLevels(root: TreeNode) -> list[float]:
 ```python
 def isValidBST(root: TreeNode) -> bool:
     def validate(node, min_val, max_val):
+        # Why return True for None?
+        # An absent node vacuously satisfies all BST constraints.
+        # It's the base case: nothing left to validate means "all good".
         if not node:
             return True
 
+        # Why use a RANGE `(min_val, max_val)` instead of just comparing to parent?
+        # BST requires every LEFT descendant (not just direct child) to be < root,
+        # and every RIGHT descendant > root. The range enforces the full ancestor chain.
+        # Example: in [5, 4, 6, null, null, 3, 7], node 3 is right child of 4 but
+        # still violates the constraint `3 > 5` (root). Without passing down min_val,
+        # this would be missed.
         if node.val <= min_val or node.val >= max_val:
             return False
 
+        # Why pass `node.val` as the new max for left, and new min for right?
+        # BST invariant: left subtree values must be < current node (upper bound),
+        # right subtree values must be > current node (lower bound).
         return (validate(node.left, min_val, node.val) and
                 validate(node.right, node.val, max_val))
 
@@ -1073,6 +1177,9 @@ def isValidBST_inorder(root: TreeNode) -> bool:
         if not inorder(node.left):
             return False
 
+        # Why `node.val <= prev` and not `< prev`?
+        # BST requires STRICT ordering -- duplicate values are not allowed.
+        # If node.val == prev, the tree violates BST property (must be strictly greater).
         if node.val <= prev:
             return False
         prev = node.val
@@ -1095,9 +1202,15 @@ def kthSmallest(root: TreeNode, k: int) -> int:
 
     def inorder(node):
         nonlocal count, result
+        # Why `result is not None` as a second early-exit condition?
+        # Once we've found the kth element, we don't need to visit any more nodes.
+        # This short-circuits the entire remaining traversal for efficiency.
         if not node or result is not None:
             return
 
+        # Why inorder (left-root-right)?
+        # Inorder traversal of a BST yields values in SORTED ASCENDING order.
+        # The kth node visited in inorder is the kth smallest element.
         inorder(node.left)
 
         count += 1
@@ -1143,6 +1256,9 @@ def kthSmallest_iterative(root: TreeNode, k: int) -> int:
 ```python
 def lowestCommonAncestor(root: TreeNode, p: TreeNode, q: TreeNode) -> TreeNode:
     while root:
+        # Why check BOTH p and q against root.val (not just one)?
+        # We need both targets to be on the same side to keep descending.
+        # If they're on opposite sides -- or one equals root -- we've found the LCA.
         if p.val < root.val and q.val < root.val:
             # Both in left subtree
             root = root.left
@@ -1150,7 +1266,8 @@ def lowestCommonAncestor(root: TreeNode, p: TreeNode, q: TreeNode) -> TreeNode:
             # Both in right subtree
             root = root.right
         else:
-            # Split point - this is LCA
+            # Split point: p and q are on different sides (or one equals root).
+            # This node is the lowest point where both are in the same subtree.
             return root
 
     return None
@@ -1159,10 +1276,17 @@ def lowestCommonAncestor(root: TreeNode, p: TreeNode, q: TreeNode) -> TreeNode:
 **Recursive:**
 ```python
 def lowestCommonAncestor_recursive(root: TreeNode, p: TreeNode, q: TreeNode) -> TreeNode:
+    # Why go left when BOTH values are less than root?
+    # BST property: if both targets are smaller, the LCA must be in the left subtree.
     if p.val < root.val and q.val < root.val:
         return lowestCommonAncestor_recursive(root.left, p, q)
+    # Why go right when BOTH values are greater?
+    # Same logic -- if both are larger, LCA is in the right subtree.
     if p.val > root.val and q.val > root.val:
         return lowestCommonAncestor_recursive(root.right, p, q)
+    # Why return `root` otherwise?
+    # The split point: one target is <= root, the other >= root.
+    # No deeper node can be ancestor of both -- root is the LCA.
     return root
 ```
 
@@ -1177,10 +1301,17 @@ def searchBST(root: TreeNode, val: int) -> TreeNode:
     while root:
         if val == root.val:
             return root
+        # Why go LEFT when `val < root.val`?
+        # BST invariant: all values in the left subtree are strictly less than root.
+        # If target is smaller, it cannot be in the right subtree -- prune that half.
         elif val < root.val:
             root = root.left
+        # Why go RIGHT when `val > root.val`?
+        # All right subtree values are strictly greater -- target must be there.
         else:
             root = root.right
+    # Why return None when root becomes None?
+    # We've exhausted all BST paths without finding val -- it doesn't exist.
     return None
 ```
 
@@ -1200,14 +1331,21 @@ def searchBST(root: TreeNode, val: int) -> TreeNode:
 
 ```python
 def buildTree(preorder: list[int], inorder: list[int]) -> TreeNode:
+    # Why return None when `preorder` is empty?
+    # No preorder elements means no nodes to construct -- the subtree is absent.
+    # This is the base case that terminates the recursion.
     if not preorder:
         return None
 
-    # First element of preorder is root
+    # Why use `preorder[0]` as the root?
+    # Preorder visits root FIRST, so the first element is always the current root.
     root_val = preorder[0]
     root = TreeNode(root_val)
 
-    # Find root in inorder
+    # Why find root_val in inorder?
+    # In inorder traversal, everything LEFT of the root index belongs to the left
+    # subtree, and everything RIGHT belongs to the right subtree.
+    # This split tells us the SIZE of each subtree, letting us slice preorder too.
     root_idx = inorder.index(root_val)
 
     # Split arrays
@@ -1282,9 +1420,15 @@ def buildTree(inorder: list[int], postorder: list[int]) -> TreeNode:
 ```python
 def sortedArrayToBST(nums: list[int]) -> TreeNode:
     def build(left, right):
+        # Why `left > right` as base case (not `left == right`)?
+        # When left > right, the subarray is empty -- no node to create.
+        # `left == right` still has one valid element to build, so we must NOT stop there.
         if left > right:
             return None
 
+        # Why choose the MIDDLE element as root?
+        # Picking the middle element splits the array evenly into two halves,
+        # producing a height-balanced BST. Picking any other index would skew the tree.
         mid = (left + right) // 2
         root = TreeNode(nums[mid])
         root.left = build(left, mid - 1)
@@ -1307,10 +1451,18 @@ def sortedArrayToBST(nums: list[int]) -> TreeNode:
 
 ```python
 def isSameTree(p: TreeNode, q: TreeNode) -> bool:
+    # Why check `not p and not q` FIRST?
+    # Both being None means both subtrees ended at the same depth -- they match here.
+    # This must come before the single-None check to avoid returning False incorrectly.
     if not p and not q:
         return True
+    # Why `not p or not q` (asymmetry) returns False?
+    # At this point we know they're not BOTH None. If exactly ONE is None,
+    # the trees have different shapes -- they can't be identical.
     if not p or not q:
         return False
+    # Why check `p.val != q.val` before recursing?
+    # Early exit: if current node values differ, no need to recurse into children.
     if p.val != q.val:
         return False
 
@@ -1326,13 +1478,20 @@ def isSameTree(p: TreeNode, q: TreeNode) -> bool:
 ```python
 def isSymmetric(root: TreeNode) -> bool:
     def is_mirror(left, right):
+        # Why `not left and not right` → True?
+        # Both arms ended at the same depth simultaneously -- symmetric so far.
         if not left and not right:
             return True
+        # Why `not left or not right` → False?
+        # One arm ended before the other -- the tree is asymmetric here.
         if not left or not right:
             return False
         if left.val != right.val:
             return False
 
+        # Why compare `left.left` with `right.right` and `left.right` with `right.left`?
+        # Mirror symmetry means outer children mirror each other, and inner children too.
+        # left.left <-> right.right is the outer pair; left.right <-> right.left is inner.
         return (is_mirror(left.left, right.right) and
                 is_mirror(left.right, right.left))
 
@@ -1378,10 +1537,18 @@ def isSubtree(root: TreeNode, subRoot: TreeNode) -> bool:
                 is_same(p.right, q.right))
 
     def dfs(node):
+        # Why return False for None (not True)?
+        # We've gone past a leaf without finding a matching subtree root.
+        # Returning False signals "subRoot not found in this branch".
         if not node:
             return False
+        # Why check `is_same` before recursing into children?
+        # If the current node matches subRoot exactly, we've found it -- no need
+        # to look deeper. Checking children first would be wasteful (they can't match).
         if is_same(node, subRoot):
             return True
+        # Why `or` (short-circuit) between left and right?
+        # We just need ONE branch to contain the subtree; finding it in either is enough.
         return dfs(node.left) or dfs(node.right)
 
     return dfs(root)
@@ -1399,10 +1566,15 @@ def isSubtree(root: TreeNode, subRoot: TreeNode) -> bool:
 
 ```python
 def lowestCommonAncestor(root: TreeNode, p: TreeNode, q: TreeNode) -> TreeNode:
+    # Why return None for None root?
+    # We've gone past a leaf without finding p or q -- signal "not found" upward.
     if not root:
         return None
 
-    # If current node is p or q, it's an ancestor
+    # Why return root immediately when `root == p or root == q`?
+    # If the current node IS one of the targets, it must be an ancestor of itself.
+    # We don't need to search deeper: even if the other target is a descendant,
+    # this node is still the LCA (it's higher up). Return it and let the caller decide.
     if root == p or root == q:
         return root
 
@@ -1410,11 +1582,15 @@ def lowestCommonAncestor(root: TreeNode, p: TreeNode, q: TreeNode) -> TreeNode:
     left = lowestCommonAncestor(root.left, p, q)
     right = lowestCommonAncestor(root.right, p, q)
 
-    # If both subtrees return non-null, current node is LCA
+    # Why `if left and right: return root`?
+    # Both subtrees returned a non-None result, meaning p was found in one side
+    # and q in the other. The CURRENT node is the split point -- the LCA.
     if left and right:
         return root
 
-    # Otherwise, return the non-null result
+    # Why `return left if left else right`?
+    # Only one subtree found a target (or neither). Propagate whichever is non-None
+    # upward. If both are None, returns None (target not in this subtree at all).
     return left if left else right
 ```
 
@@ -1800,3 +1976,54 @@ Where: n = nodes, h = height, w = max width
 6. Attempt hard problems (124, 297)
 
 Good luck with your interview preparation!
+
+---
+
+## Appendix: Conditional Quick Reference
+
+This table lists every key condition used in this handbook, its plain-English meaning, and the intuition behind it.
+
+### A. Base Cases & Null Checks
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if not node: return 0` | Node is absent; return zero | Recursion always reaches past leaves. Returning 0 (the additive identity for depth/height) lets the parent's `+1` combine cleanly without crashing. |
+| `if not node: return None` | Node is absent; nothing found | Signals "target not in this subtree" for search and LCA problems. The caller can then check if both sides returned non-None. |
+| `if not node: return False` | Node is absent; path invalid | Used in path-sum and subtree problems where None is NOT a valid endpoint -- a path must terminate at a real leaf. |
+| `if not node: return True` | Node is absent; constraint satisfied | Used in BST validation: an empty subtree vacuously satisfies all BST constraints. |
+| `if not preorder: return None` | No elements left; no node to build | Base case for tree construction -- an empty array means no subtree to create. |
+| `if left > right: return None` | Subarray is empty; stop recursion | Used in sorted-array-to-BST: `left == right` still has one element, but `left > right` means the slice is exhausted. |
+| `if not root: return []` | Empty tree; return empty result | Guards BFS/level-order so we never push None into the queue or enter the while loop. |
+
+### B. BST Property Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if val < root.val: go left` | Target is smaller; must be in left subtree | BST invariant: ALL left-subtree values are strictly less than the root. Smaller target cannot be on the right. |
+| `if val > root.val: go right` | Target is larger; must be in right subtree | BST invariant: ALL right-subtree values are strictly greater than the root. |
+| `if node.val <= min_val or node.val >= max_val: return False` | Node violates its valid range | Propagating a range (not just the direct parent) catches violations from ancestors further up the tree. |
+| `if node.val <= prev: return False` (inorder) | Current value not strictly greater than previous | Inorder BST traversal must produce strictly ascending values. Equal values violate the BST strict-ordering requirement. |
+| `if p.val < root.val and q.val < root.val: go left` | Both targets are smaller; LCA is in left subtree | BST LCA: if both targets are on the same side, the LCA cannot be at the current root or above it -- descend to narrow down. |
+| `else: return root` (BST LCA) | Targets split across current node | The current node is the lowest point where both targets are "reachable" from different sides -- it is the LCA by definition. |
+
+### C. DFS Path & Depth Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `if not node.left and not node.right` | Current node is a leaf | A leaf has NO children at all. Checking only one child would incorrectly treat a one-child node as a leaf endpoint. |
+| `return 1 + max(left_h, right_h)` | Height = deeper child's height + 1 | We must report the LONGEST path downward (for diameter and balance checks). Min would undercount the reachable depth. |
+| `diameter = max(diameter, left_h + right_h)` | Diameter candidate = both arms added | The longest path THROUGH a node goes down BOTH subtrees simultaneously. Using max (only one arm) would miss this two-directional path. |
+| `left_gain = max(max_gain(node.left), 0)` | Clamp negative subtree gain to zero | If a subtree's maximum path sum is negative, taking it shrinks our total. Clamping to 0 means "don't extend through that arm". |
+| `if root == p or root == q: return root` (LCA) | Found one target; it must be the LCA or an ancestor of the other | If one target is an ancestor of the other, we return immediately -- no deeper search needed because nothing below can be a higher ancestor. |
+| `return left if left else right` (LCA) | Propagate the found target upward | If only one subtree found a target (the other returned None), we bubble the found node up so the caller can check if it also finds the other side. |
+| `if abs(left_height - right_height) > 1: return -1` | Height difference exceeds 1; tree is unbalanced | AVL-style balance: difference of 0 or 1 is allowed. Returning -1 as a sentinel short-circuits all further computation once imbalance is detected. |
+
+### D. BFS Level-Order Conditions
+
+| Condition | Plain English | Why it works |
+|-----------|---------------|--------------|
+| `while queue` | Keep processing as long as nodes remain | The queue is non-empty exactly when unprocessed nodes exist. When all nodes have been dequeued and no new children added, the loop ends naturally. |
+| `level_size = len(queue)` (snapshot before inner loop) | Freeze the count of current-level nodes | As we process nodes we enqueue their children into the same queue. Snapshotting first ensures we process ONLY this level's nodes, not the newly added next level. |
+| `for _ in range(level_size)` | Process exactly this level's nodes | Using `while queue` for the inner loop would consume next-level nodes too, mixing levels and breaking per-level grouping. |
+| `if i == level_size - 1: record` (right side view) | Last node in this level is the rightmost visible one | BFS processes left-to-right within each level, so the final node dequeued per level is the rightmost one -- exactly what the right side view requires. |
+| `if node.left: queue.append(node.left)` | Only enqueue non-None children | Enqueueing None would crash later when we try to access `node.val` on a None object dequeued from the queue. |
